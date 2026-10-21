@@ -1,0 +1,32 @@
+{
+  "slug": "ddpm",
+  "order": 2,
+  "kind": "Paper 精译",
+  "series": "NeurIPS 2020",
+  "title": "去噪扩散概率模型",
+  "title_lead": "去噪",
+  "title_accent": "扩散概率模型",
+  "title_en": "Denoising Diffusion Probabilistic Models",
+  "dek": "DDPM 用一条固定的加噪链把图像慢慢破坏，再训练神经网络逐级逆转它。本文精译这篇 NeurIPS 2020 论文：从变分下界与简化目标，到 U-Net 架构、渐进式编码与 FID 3.17。",
+  "authors": [
+    { "name": "Jonathan Ho", "url": "https://arxiv.org/search/?query=Jonathan+Ho&searchtype=author" },
+    { "name": "Ajay Jain", "url": "https://arxiv.org/search/?query=Ajay+Jain&searchtype=author" },
+    { "name": "Pieter Abbeel", "url": "https://arxiv.org/search/?query=Pieter+Abbeel&searchtype=author" }
+  ],
+  "date": "2020-06-19",
+  "year": "2020",
+  "venue": "NeurIPS 2020",
+  "reading_minutes": 45,
+  "tags": ["扩散模型基础", "数学推导", "DDPM", "图像生成"],
+  "summary": "扩散模型真正的起点：用变分推断训练一条去噪马尔可夫链。完整保留原文的公式编号、算法与实验表格，并把关键推导讲清楚。",
+  "cover": "images/fig1-samples.webp",
+  "cover_alt": "DDPM 生成的 CelebA-HQ 人脸样本与无条件 CIFAR-10 样本",
+  "cover_caption": "CelebA-HQ 256×256 与 CIFAR-10 样本",
+  "cover_meta": "无条件生成 · DDPM · 2020",
+  "cover_ratio": "16x9",
+  "source_url": "https://arxiv.org/abs/2006.11239",
+  "pdf_url": "https://arxiv.org/pdf/2006.11239",
+  "code_url": "https://github.com/hojonathanho/diffusion",
+  "disclaimer": "本页面为学习交流用途的中文精译。原文、图表及相关材料的版权归原作者所有。正文为全译，附录为导读与关键结论选译。",
+  "build": true
+}

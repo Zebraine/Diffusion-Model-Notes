@@ -1,0 +1,50 @@
+{
+  "slug": "annotated-diffusion",
+  "order": 1,
+  "kind": "Blog 精读",
+  "series": "Paper Walkthrough",
+  "title": "图解扩散模型",
+  "title_lead": "图解",
+  "title_accent": "扩散模型",
+  "title_en": "The Annotated Diffusion Model",
+  "dek": "从 DDPM 论文出发，用 PyTorch 从零搭起一个扩散模型：让噪声一步步变成图像，也让公式一步步变成代码。",
+  "authors": [
+    {
+      "name": "Niels Rogge",
+      "url": "https://huggingface.co/nielsr"
+    },
+    {
+      "name": "Kashif Rasul",
+      "url": "https://huggingface.co/kashif"
+    }
+  ],
+  "date": "2022-06-07",
+  "year": "2022",
+  "venue": "Hugging Face Blog",
+  "reading_minutes": 30,
+  "tags": [
+    "扩散模型基础",
+    "代码实现",
+    "DDPM"
+  ],
+  "summary": "从 DDPM 的直觉出发，把前向加噪、目标函数、U-Net 与 PyTorch 实现串成一条线；适合作为读原始论文之前的第一站。",
+  "cover": "images/hero.webp",
+  "cover_alt": "一张猫图在扩散过程中逐渐被噪声覆盖的三个阶段：清晰图像、重度噪声和纯噪声",
+  "cover_caption": "从清晰图像到纯噪声",
+  "cover_meta": "前向扩散过程的三个阶段 · DDPM · 2020",
+  "cover_ratio": "3x1",
+  "stats": {
+    "sections": 10,
+    "figures": 11,
+    "formulas": 125,
+    "code_blocks": 29,
+    "tables": 0,
+    "algorithms": 2
+  },
+  "source_url": "https://huggingface.co/blog/annotated-diffusion",
+  "pdf_url": "https://arxiv.org/abs/2006.11239",
+  "code_url": "https://colab.research.google.com/github/huggingface/notebooks/blob/main/examples/annotated_diffusion.ipynb",
+  "disclaimer": "本页面为学习交流用途的中文翻译。原文、插图及相关材料的版权归 Hugging Face 与原作者所有。",
+  "static": true,
+  "cover_fit": "contain"
+}

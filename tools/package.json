@@ -1,0 +1,15 @@
+{
+  "name": "diffusion-notes-papers-build",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Static build for the Diffusion Model Notes paper library",
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "node build.mjs --check"
+  },
+  "dependencies": {
+    "katex": "0.16.11",
+    "markdown-it": "^14.1.0"
+  }
+}

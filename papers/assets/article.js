@@ -4,6 +4,7 @@
   var doc = document.documentElement;
   var body = document.body;
   var article = document.getElementById("article");
+  if (!article) return;
   var progressBar = document.getElementById("progress-bar");
   var tocPercent = document.querySelectorAll("[data-toc-percent]");
   var backToTop = document.querySelector(".back-to-top");
@@ -36,7 +37,7 @@
     button.type = "button";
     button.className = "copy-btn";
     button.textContent = "复制代码";
-    button.setAttribute("aria-label", "复制这段 Python 代码");
+    button.setAttribute("aria-label", "复制这段代码");
 
     button.addEventListener("click", function () {
       var text = code.innerText.replace(/\s+$/, "");
@@ -93,7 +94,7 @@
 
   /* Horizontal overflow areas need keyboard access to their scrollbars. */
   var scrollRegions = document.querySelectorAll(
-    ".code-body, .math-display, .output-block pre"
+    ".code-body, .math-display, .math-scroll, .output-block pre"
   );
 
   function syncScrollableRegions() {
