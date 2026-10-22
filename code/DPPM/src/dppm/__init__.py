@@ -1,4 +1,4 @@
-from main import main
+from dppm import main
 
 if __name__ == "__main__":
-    main()
+    main.main()
