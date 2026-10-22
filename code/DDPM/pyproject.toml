@@ -1,7 +1,7 @@
 [project]
-name = "dppm"
+name = "ddpm"
 version = "0.1.0"
-description = "Add your description here"
+description = "CPU-friendly DDPM: modular U-Net, diffusion, training and sampling"
 readme = "README.md"
 authors = [
     { name = "Zebraine", email = "zebrainee@gmail.com" }
@@ -11,13 +11,14 @@ dependencies = [
     "datasets>=5.1.0",
     "einops>=0.8.2",
     "matplotlib>=3.11.2",
+    "requests>=2.34.2",
     "torch>=2.14.1",
     "torchvision>=0.29.1",
     "tqdm>=4.70.1",
 ]
 
 [project.scripts]
-dppm = "dppm:main"
+ddpm = "ddpm.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.13.1,<0.14.0"]

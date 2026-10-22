@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1300" height="650" viewBox="0 0 1300 650">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#0f766e"/>
+    </marker>
+    <marker id="arrowAmber" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#b96518"/>
+    </marker>
+  </defs>
+  <rect width="1300" height="650" fill="#fffdf8"/>
+  <text x="36" y="42" font-family="JetBrains Maple Mono, monospace" font-size="14" letter-spacing="2" fill="#b96518">U-NET / PIXELCNN++ BACKBONE</text>
+  <text x="36" y="74" font-family="Noto Sans CJK SC, sans-serif" font-size="22" font-weight="700" fill="#20211f">多尺度去噪骨干：编码 → 瓶颈 → 解码</text>
+
+  <text x="100" y="128" font-family="JetBrains Maple Mono, monospace" font-size="12" fill="#555149">input 64×64×3</text>
+  <line x1="195" y1="138" x2="195" y2="166" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <g font-family="JetBrains Maple Mono, monospace" font-size="12">
+    <rect x="100" y="170" width="190" height="80" rx="10" fill="#17443f"/>
+    <text x="116" y="202" fill="#ffffff">64×64×32</text><text x="116" y="224" fill="#a8d8d0">ResBlock + LinAttn</text>
+
+    <rect x="100" y="290" width="190" height="80" rx="10" fill="#2c6f66"/>
+    <text x="116" y="322" fill="#ffffff">32×32×64</text><text x="116" y="344" fill="#d4efea">ResBlock + LinAttn</text>
+
+    <rect x="100" y="410" width="190" height="80" rx="10" fill="#6d8278"/>
+    <text x="116" y="442" fill="#ffffff">16×16×128</text><text x="116" y="464" fill="#eef4f1">ResBlock + LinAttn</text>
+
+    <rect x="555" y="470" width="190" height="80" rx="10" fill="#111821"/>
+    <text x="571" y="502" fill="#ffffff">8×8×256</text><text x="571" y="524" fill="#7fd1c4">ResBlock + SelfAttn</text>
+
+    <rect x="1010" y="410" width="190" height="80" rx="10" fill="#6d8278"/>
+    <text x="1026" y="442" fill="#ffffff">16×16×128</text><text x="1026" y="464" fill="#eef4f1">ResBlock + LinAttn</text>
+
+    <rect x="1010" y="290" width="190" height="80" rx="10" fill="#2c6f66"/>
+    <text x="1026" y="322" fill="#ffffff">32×32×64</text><text x="1026" y="344" fill="#d4efea">ResBlock + LinAttn</text>
+
+    <rect x="1010" y="170" width="190" height="80" rx="10" fill="#17443f"/>
+    <text x="1026" y="202" fill="#ffffff">64×64×32</text><text x="1026" y="224" fill="#a8d8d0">ResBlock + LinAttn</text>
+  </g>
+
+  <g stroke="#0f766e" stroke-width="2" fill="none" marker-end="url(#arrow)">
+    <line x1="195" y1="250" x2="195" y2="286"/>
+    <line x1="195" y1="370" x2="195" y2="406"/>
+    <path d="M 195 490 L 195 595 L 530 595 L 530 510 L 551 510"/>
+    <path d="M 745 510 L 770 510 L 770 595 L 1105 595 L 1105 494"/>
+    <line x1="1105" y1="410" x2="1105" y2="374"/>
+    <line x1="1105" y1="290" x2="1105" y2="254"/>
+    <line x1="1105" y1="170" x2="1105" y2="138"/>
+  </g>
+  <text x="122" y="275" font-family="JetBrains Maple Mono, monospace" font-size="10.5" fill="#0a5c56">down ↓</text>
+  <text x="122" y="395" font-family="JetBrains Maple Mono, monospace" font-size="10.5" fill="#0a5c56">down ↓</text>
+  <text x="1128" y="275" font-family="JetBrains Maple Mono, monospace" font-size="10.5" fill="#0a5c56">up ↑</text>
+  <text x="1128" y="395" font-family="JetBrains Maple Mono, monospace" font-size="10.5" fill="#0a5c56">up ↑</text>
+
+  <g stroke="#b96518" stroke-width="1.8" stroke-dasharray="6 5" fill="none" marker-end="url(#arrowAmber)">
+    <path d="M 290 190 L 390 190 L 390 105 L 910 105 L 910 190 L 1006 190"/>
+    <line x1="290" y1="330" x2="1006" y2="330"/>
+    <line x1="290" y1="450" x2="1006" y2="450"/>
+  </g>
+  <g font-family="Noto Sans CJK SC, sans-serif" font-size="11.5" fill="#b96518">
+    <text x="650" y="97" text-anchor="middle">skip connection</text>
+    <text x="650" y="322" text-anchor="middle">skip connection</text>
+    <text x="650" y="442" text-anchor="middle">skip connection</text>
+  </g>
+
+  <text x="1010" y="128" font-family="JetBrains Maple Mono, monospace" font-size="12" fill="#555149">output 64×64×3</text>
+  <text x="36" y="628" font-family="Noto Sans CJK SC, sans-serif" font-size="12" fill="#6b6459">时间条件：t → sinusoidal → MLP(4d) → 每个 ResBlock 的 scale / shift；图中省略了这些连线。</text>
+
+</svg>

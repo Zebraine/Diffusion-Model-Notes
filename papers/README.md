@@ -18,9 +18,19 @@ papers/
 │   ├── index.html
 │   ├── paper.json
 │   └── images/
-└── ddpm/                       # 002 · 由 content.md 构建
+├── ddpm/                       # 002 · 论文译文，由 content.md 构建
+│   ├── content.md
+│   ├── index.html              # 生成物，不要手改
+│   ├── paper.json
+│   └── images/
+├── ddpm-math/                  # 003 · 数学原理长文
+│   ├── content.md
+│   ├── index.html
+│   ├── paper.json
+│   └── images/
+└── ddpm-engineering/           # 004 · 工程实现笔记
     ├── content.md
-    ├── index.html              # 生成物，不要手改
+    ├── index.html
     ├── paper.json
     └── images/
 ```
@@ -70,6 +80,8 @@ mkdir -p papers/<slug>/images
 ```
 
 `order` 决定编号、首页排序与上一篇/下一篇。`cover` 相对于论文目录。`cover_ratio` 支持 `3x1`、`16x9`、`2x1`，默认 `3x1`；`cover_fit` 可选 `cover`（默认，裁切）或 `contain`（完整显示，适合宽幅三联图）。
+
+笔记类页面还可以设置 `note_label`（默认“翻译说明”）、`note_seal`（默认“译”）、`source_label`、`source_button_label`、`source_action_label`，用来区分“论文翻译”和“原创笔记”。
 
 ### 2. 写正文
 

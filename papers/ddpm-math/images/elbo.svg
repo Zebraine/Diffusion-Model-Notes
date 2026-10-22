@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="430" viewBox="0 0 1200 430">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#0f766e"/>
+    </marker>
+  </defs>
+  <rect width="1200" height="430" fill="#fffdf8"/>
+  <text x="40" y="48" font-family="Noto Sans CJK SC, sans-serif" font-size="22" font-weight="700" fill="#20211f">变分上界 = 三项 KL + 一个解码项</text>
+  <text x="40" y="78" font-family="JetBrains Maple Mono, monospace" font-size="15" fill="#6b6459">ELBO 的三段：先验匹配 → 逐步去噪 → 数据重构</text>
+
+  <rect x="40" y="120" width="340" height="220" rx="14" fill="#fbf7ee" stroke="#e1d9cb"/>
+  <rect x="40" y="120" width="6" height="220" rx="3" fill="#6d8278"/>
+  <text x="70" y="160" font-family="JetBrains Maple Mono, monospace" font-size="18" fill="#0a5c56">L_T</text>
+  <text x="70" y="196" font-family="Noto Sans CJK SC, sans-serif" font-size="20" font-weight="600" fill="#20211f">先验匹配</text>
+  <text x="70" y="230" font-family="JetBrains Maple Mono, monospace" font-size="13" fill="#555149">D_KL( q(x_T|x_0) || p(x_T) )</text>
+  <text x="70" y="260" font-family="Noto Sans CJK SC, sans-serif" font-size="14" fill="#6b6459">前向固定、p(x_T)=N(0,I)</text>
+  <text x="70" y="286" font-family="Noto Sans CJK SC, sans-serif" font-size="14" fill="#6b6459">训练时通常为常数，可忽略</text>
+
+  <rect x="430" y="120" width="340" height="220" rx="14" fill="#fbf7ee" stroke="#e1d9cb"/>
+  <rect x="430" y="120" width="6" height="220" rx="3" fill="#0f766e"/>
+  <text x="460" y="160" font-family="JetBrains Maple Mono, monospace" font-size="18" fill="#0a5c56">L_{t-1}</text>
+  <text x="460" y="196" font-family="Noto Sans CJK SC, sans-serif" font-size="20" font-weight="600" fill="#20211f">逐步去噪</text>
+  <text x="460" y="230" font-family="JetBrains Maple Mono, monospace" font-size="12.5" fill="#555149">D_KL( q(x_{t-1}|x_t,x_0) ||</text>
+  <text x="460" y="252" font-family="JetBrains Maple Mono, monospace" font-size="12.5" fill="#555149">       pθ(x_{t-1}|x_t) )</text>
+  <text x="460" y="282" font-family="Noto Sans CJK SC, sans-serif" font-size="14" fill="#6b6459">训练的主项；</text>
+  <text x="460" y="306" font-family="Noto Sans CJK SC, sans-serif" font-size="14" fill="#6b6459">高斯 KL → 均值的 L2 回归</text>
+
+  <rect x="820" y="120" width="340" height="220" rx="14" fill="#fbf7ee" stroke="#e1d9cb"/>
+  <rect x="820" y="120" width="6" height="220" rx="3" fill="#b96518"/>
+  <text x="850" y="160" font-family="JetBrains Maple Mono, monospace" font-size="18" fill="#0a5c56">L_0</text>
+  <text x="850" y="196" font-family="Noto Sans CJK SC, sans-serif" font-size="20" font-weight="600" fill="#20211f">数据重构 / 解码</text>
+  <text x="850" y="230" font-family="JetBrains Maple Mono, monospace" font-size="13" fill="#555149">- log pθ(x_0 | x_1)</text>
+  <text x="850" y="260" font-family="Noto Sans CJK SC, sans-serif" font-size="14" fill="#6b6459">对应 t=1；</text>
+  <text x="850" y="286" font-family="Noto Sans CJK SC, sans-serif" font-size="14" fill="#6b6459">简化训练中并入 t=1 的回归</text>
+
+  <line x1="380" y1="230" x2="426" y2="230" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="770" y1="230" x2="816" y2="230" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="40" y="366" width="1120" height="44" rx="10" fill="#0f766e" opacity="0.07"/>
+  <text x="60" y="394" font-family="Noto Sans CJK SC, sans-serif" font-size="15" fill="#0a5c56">核心化简：固定方差后，每一项高斯 KL 都只依赖均值；再用 ε 参数化，就得到式 (13) 的简单 MSE。</text>
+</svg>

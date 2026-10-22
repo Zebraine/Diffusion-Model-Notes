@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DDPM 的工程实现 · Engineering a Denoising Diffusion Probabilistic Model 中文精译</title>
+  <meta name="description" content="把论文里的公式落到可训练、可复现、可在 CPU 上运行的代码：U-Net 的每个块、时间条件、损失尺度、EMA、检查点、采样加速与常见数值陷阱。">
+  <meta name="author" content="Diffusion Model Notes">
+  <meta name="theme-color" content="#f6f1e8">
+  <meta name="color-scheme" content="light">
+  <meta property="og:type" content="article">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:title" content="DDPM 的工程实现 · Engineering a Denoising Diffusion Probabilistic Model">
+  <meta property="og:description" content="把论文里的公式落到可训练、可复现、可在 CPU 上运行的代码：U-Net 的每个块、时间条件、损失尺度、EMA、检查点、采样加速与常见数值陷阱。">
+  <meta property="article:published_time" content="2026-10-22">
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="images/cover.webp" as="image" type="image/webp">
+  <link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+  <link rel="stylesheet" href="../assets/pygments.css">
+  <link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+  <a class="skip-link" href="#article">跳到正文</a>
+  <div class="reading-progress" aria-hidden="true"><span id="progress-bar"></span></div>
+
+  <header class="site-header">
+    <div class="shell header-inner">
+      <a class="brand" href="../index.html" aria-label="Diffusion Model Notes，返回论文库">
+        <span class="brand-mark" aria-hidden="true">DM</span>
+        <span class="brand-copy">
+          <strong>Diffusion Model Notes</strong>
+          <small>papers / 004</small>
+        </span>
+      </a>
+      <nav class="header-nav" aria-label="页面导航">
+        <a href="../index.html">论文库</a>
+        <a href="#article">正文</a>
+        <a class="source-link" href="https://arxiv.org/abs/2006.11239" target="_blank" rel="noopener noreferrer">DDPM 论文 ↗</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="shell hero-inner">
+        <div class="hero-copy">
+          <a class="mobile-back" href="../index.html">← 论文库</a>
+          <p class="eyebrow">
+            <span class="eyebrow-dot" aria-hidden="true"></span>
+            <span>DDPM 深度笔记</span>
+            <span class="eyebrow-slash" aria-hidden="true">/</span>
+            <span>工程笔记</span>
+          </p>
+          <h1><span>DDPM 的</span><span class="title-accent">工程实现</span></h1>
+          <p class="original-title">Engineering a Denoising Diffusion Probabilistic Model</p>
+          <p class="hero-dek">把论文里的公式落到可训练、可复现、可在 CPU 上运行的代码：U-Net 的每个块、时间条件、损失尺度、EMA、检查点、采样加速与常见数值陷阱。</p>
+
+          <div class="meta-row">
+            <div class="meta-authors">
+              <span class="author-stack" aria-hidden="true"><span class="author-initial">DN</span></span>
+              <span class="author-names"><span>Diffusion Model Notes</span></span>
+            </div>
+            <span class="meta-sep" aria-hidden="true"></span>
+            <time datetime="2026-10-22">2026.10.22</time>
+            <span class="meta-sep" aria-hidden="true"></span>
+            <span>代码笔记</span>
+            <span class="meta-sep" aria-hidden="true"></span>
+            <span>约 30 分钟</span>
+          </div>
+
+          <div class="hero-actions">
+            <a class="button button-primary" href="#article">开始阅读 <span aria-hidden="true">↓</span></a>
+            <a class="button button-ghost" href="https://arxiv.org/pdf/2006.11239" target="_blank" rel="noopener noreferrer">PDF 原文 ↗</a>
+            <a class="button button-ghost" href="https://arxiv.org/abs/2006.11239" target="_blank" rel="noopener noreferrer">原始论文 ↗</a>
+          </div>
+
+          <div class="hero-stats" aria-label="文章概览">
+            <div class="hero-stat"><strong>14</strong><span>章节 · Sections</span></div>
+            <div class="hero-stat"><strong>2</strong><span>图示 · Figures</span></div>
+            <div class="hero-stat"><strong>6</strong><span>公式 · Equations</span></div>
+            <div class="hero-stat"><strong>14</strong><span>代码 · Snippets</span></div>
+          </div>
+        </div>
+
+        <figure class="hero-cover" data-ratio="16x9">
+          <img src="images/cover.webp" alt="DDPM 工程实现封面：训练与采样流水线代码面板" width="1600" height="900" fetchpriority="high" decoding="async">
+          <figcaption>
+            <strong>从公式到可运行代码</strong>
+            <span class="cover-dot" aria-hidden="true"></span>
+            <span>工程实现 · 2026</span>
+          </figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <div class="shell article-layout">
+      <aside class="toc">
+  <div class="toc-inner">
+    <p class="toc-label">目录 <span>CONTENTS</span></p>
+    <nav>
+<a href="#overview"><span class="toc-num">01</span><span>导读：公式之外的工程问题</span></a>
+<a href="#pipeline"><span class="toc-num">02</span><span>总体管线</span></a>
+<a href="#unet"><span class="toc-num">03</span><span>U-Net 结构</span></a>
+<a class="toc-sub" href="#残差块与条件归一化"><span>残差块与条件归一化</span></a>
+<a class="toc-sub" href="#权重标准化"><span>权重标准化</span></a>
+<a class="toc-sub" href="#下采样与上采样"><span>下采样与上采样</span></a>
+<a href="#time"><span class="toc-num">04</span><span>时间条件</span></a>
+<a href="#attention"><span class="toc-num">05</span><span>注意力与内存</span></a>
+<a href="#optimization"><span class="toc-num">06</span><span>损失、优化与稳定性</span></a>
+<a class="toc-sub" href="#损失函数"><span>损失函数</span></a>
+<a class="toc-sub" href="#梯度裁剪"><span>梯度裁剪</span></a>
+<a class="toc-sub" href="#优化器与学习率"><span>优化器与学习率</span></a>
+<a class="toc-sub" href="#混合精度"><span>混合精度</span></a>
+<a href="#data"><span class="toc-num">07</span><span>数据管线</span></a>
+<a href="#ema"><span class="toc-num">08</span><span>EMA 与检查点</span></a>
+<a class="toc-sub" href="#为什么需要-ema"><span>为什么需要 EMA</span></a>
+<a class="toc-sub" href="#检查点里应该有什么"><span>检查点里应该有什么</span></a>
+<a href="#sampling"><span class="toc-num">09</span><span>采样加速：DDPM 与 DDIM</span></a>
+<a href="#pitfalls"><span class="toc-num">10</span><span>数值与性能陷阱</span></a>
+<a href="#code-map"><span class="toc-num">11</span><span>代码地图与复现</span></a>
+<a href="#next"><span class="toc-num">12</span><span>进一步优化</span></a>
+<a href="#summary"><span class="toc-num">13</span><span>小结</span></a>
+<a href="#further-reading"><span class="toc-num">14</span><span>延伸阅读</span></a>
+    </nav>
+    <div class="toc-foot"><span>阅读进度</span><span class="toc-percent" data-toc-percent>0%</span></div>
+  </div>
+</aside>
+      <details class="mobile-toc">
+  <summary><span>本文目录</span><span class="summary-arrow" aria-hidden="true">⌄</span></summary>
+  <nav>
+<a href="#overview"><span class="toc-num">01</span><span>导读：公式之外的工程问题</span></a>
+<a href="#pipeline"><span class="toc-num">02</span><span>总体管线</span></a>
+<a href="#unet"><span class="toc-num">03</span><span>U-Net 结构</span></a>
+<a class="toc-sub" href="#残差块与条件归一化"><span>残差块与条件归一化</span></a>
+<a class="toc-sub" href="#权重标准化"><span>权重标准化</span></a>
+<a class="toc-sub" href="#下采样与上采样"><span>下采样与上采样</span></a>
+<a href="#time"><span class="toc-num">04</span><span>时间条件</span></a>
+<a href="#attention"><span class="toc-num">05</span><span>注意力与内存</span></a>
+<a href="#optimization"><span class="toc-num">06</span><span>损失、优化与稳定性</span></a>
+<a class="toc-sub" href="#损失函数"><span>损失函数</span></a>
+<a class="toc-sub" href="#梯度裁剪"><span>梯度裁剪</span></a>
+<a class="toc-sub" href="#优化器与学习率"><span>优化器与学习率</span></a>
+<a class="toc-sub" href="#混合精度"><span>混合精度</span></a>
+<a href="#data"><span class="toc-num">07</span><span>数据管线</span></a>
+<a href="#ema"><span class="toc-num">08</span><span>EMA 与检查点</span></a>
+<a class="toc-sub" href="#为什么需要-ema"><span>为什么需要 EMA</span></a>
+<a class="toc-sub" href="#检查点里应该有什么"><span>检查点里应该有什么</span></a>
+<a href="#sampling"><span class="toc-num">09</span><span>采样加速：DDPM 与 DDIM</span></a>
+<a href="#pitfalls"><span class="toc-num">10</span><span>数值与性能陷阱</span></a>
+<a href="#code-map"><span class="toc-num">11</span><span>代码地图与复现</span></a>
+<a href="#next"><span class="toc-num">12</span><span>进一步优化</span></a>
+<a href="#summary"><span class="toc-num">13</span><span>小结</span></a>
+<a href="#further-reading"><span class="toc-num">14</span><span>延伸阅读</span></a>
+  </nav>
+</details>
+      <article class="prose" id="article">
+        <div class="translation-note">
+          <span class="note-seal" aria-hidden="true">记</span>
+          <div>
+            <strong>阅读说明</strong>
+            <p>这是一篇工程笔记，重点是实现选择与权衡。DDPM 的数学推导见《DDPM 的数学原理》，本文不重复。代码示例来自 code/DDPM。</p>
+          </div>
+        </div>
+
+<div class="abstract-card">
+<p class="abstract-label">Abstract / 导读</p>
+<p>数学篇回答“为什么能生成”，工程篇回答“怎样把它稳定地训练出来、采样出来、复现出来”。本文以 <code>code/DDPM</code> 的实现为线索，拆解 U-Net 的每个块、时间条件、注意力、损失与优化、数据管线、EMA、检查点和 DDIM 加速，并列出实际调参时最容易踩的数值与性能陷阱。DDPM 的完整数学推导见<a href="../ddpm-math/index.html">《DDPM 的数学原理》</a>，本文不重复。</p>
+<div class="keywords"><span>U-Net</span><span>EMA</span><span>DDIM</span><span>混合精度</span><span>检查点</span></div>
+</div>
+<h2 id="overview"><span class="h2-num" aria-hidden="true">01</span>导读：公式之外的工程问题 <a class="heading-anchor" href="#overview" aria-label="本节永久链接" title="本节链接">#</a></h2><p>把 DDPM 写成公式只需要几行，把它做成一个能训练、能复现、能在 CPU 上跑通的系统，需要回答另一组问题：</p>
+<ul>
+<li>网络应该长什么样？为什么是 U-Net，而不是普通 CNN？</li>
+<li>时间步 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>t</mi></mrow><annotation encoding="application/x-tex">t</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6151em;"></span><span class="mord mathnormal">t</span></span></span></span></span> 怎样进入网络？为什么不能只把它拼到输入上？</li>
+<li>损失用 L1、L2 还是 Huber？梯度要不要裁剪？</li>
+<li>为什么需要 EMA？EMA 和原始权重什么时候用哪个？</li>
+<li>检查点里应该存什么，才能断点续训、又能直接采样？</li>
+<li>1000 步 DDPM 太慢，DDIM 为什么能 50 步？代价是什么？</li>
+<li>哪些数值操作会在 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>t</mi></mrow><annotation encoding="application/x-tex">t</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6151em;"></span><span class="mord mathnormal">t</span></span></span></span></span> 接近 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>0</mn></mrow><annotation encoding="application/x-tex">0</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">0</span></span></span></span></span> 或 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>T</mi></mrow><annotation encoding="application/x-tex">T</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.13889em;">T</span></span></span></span></span> 时爆炸？</li>
+</ul>
+<p>本文按训练和采样的真实数据流展开，并把这些选择和代码里的模块一一对应。</p>
+<h2 id="pipeline"><span class="h2-num" aria-hidden="true">02</span>总体管线 <a class="heading-anchor" href="#pipeline" aria-label="本节永久链接" title="本节链接">#</a></h2><p>一次训练 step 和一次采样，是两条方向相反、但共享同一个 U-Net 的流水线。</p>
+<figure class="article-figure figure--wide" id="fig-pipeline">
+<a class="zoom-link" href="images/pipeline.svg" data-caption="DDPM 的训练流水线与采样流水线。">
+<img src="images/pipeline.svg" alt="DDPM 训练流水线：数据、随机 t 和噪声、构造 x_t、U-Net 预测噪声、损失、反传；下方是采样流水线" width="1300" height="470" loading="lazy" decoding="async">
+</a>
+<figcaption><span class="fig-no">图 1</span>训练时随机采样 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>t</mi></mrow><annotation encoding="application/x-tex">t</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6151em;"></span><span class="mord mathnormal">t</span></span></span></span></span> 和 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi mathvariant="bold-italic">ϵ</mi></mrow><annotation encoding="application/x-tex">\boldsymbol{\epsilon}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4444em;"></span><span class="mord"><span class="mord"><span class="mord boldsymbol">ϵ</span></span></span></span></span></span></span>，一次前向就能得到监督信号；采样时从 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi mathvariant="bold">x</mi><mi>T</mi></msub></mrow><annotation encoding="application/x-tex">\mathbf{x}_T</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.5944em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathbf">x</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3283em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right:0.13889em;">T</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span></span> 开始，反复调用同一个 U-Net。EMA、检查点、日志和预览是训练侧的旁路。<span class="fig-source">笔记重绘</span></figcaption>
+</figure>
+<p>训练 step 的核心只有几行：</p>
+<div class="code-block" role="group" aria-label="Python 代码示例">
+<div class="code-head"><span class="code-lang">Python</span><span class="code-actions"></span></div>
+<pre class="code-body"><code class="language-python"><span class="n">timesteps</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span>
+    <span class="mi">0</span><span class="p">,</span> <span class="n">diffusion</span><span class="o">.</span><span class="n">timesteps</span><span class="p">,</span> <span class="p">(</span><span class="n">images</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],),</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">long</span>
+<span class="p">)</span>
+<span class="n">loss</span> <span class="o">=</span> <span class="n">diffusion</span><span class="o">.</span><span class="n">p_losses</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">images</span><span class="p">,</span> <span class="n">timesteps</span><span class="p">)</span>
+
+<span class="n">optimizer</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">(</span><span class="n">set_to_none</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">loss</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">clip_grad_norm_</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="mf">1.0</span><span class="p">)</span>
+<span class="n">optimizer</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+<span class="n">ema</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">model</span><span class="p">)</span></code></pre>
+</div><p>对应 <code>src/dppm/train.py</code> 的训练循环。注意这里<strong>没有</strong>显式构造 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi mathvariant="bold">x</mi><mi>t</mi></msub></mrow><annotation encoding="application/x-tex">\mathbf{x}_t</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.5944em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathbf">x</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span></span>：它藏在 <code>p_losses</code> 内部，由 <code>q_sample</code> 用闭式完成。这样每个 step 只需要一次网络前向和一次反向，不需要展开 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>T</mi></mrow><annotation encoding="application/x-tex">T</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.13889em;">T</span></span></span></span></span> 步。</p>
+<p>采样则是：</p>
+<div class="code-block" role="group" aria-label="Python 代码示例">
+<div class="code-head"><span class="code-lang">Python</span><span class="code-actions"></span></div>
+<pre class="code-body"><code class="language-python"><span class="n">image</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">t_index</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">diffusion</span><span class="o">.</span><span class="n">timesteps</span><span class="p">)):</span>
+    <span class="n">t</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">full</span><span class="p">((</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],),</span> <span class="n">t_index</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">long</span><span class="p">)</span>
+    <span class="n">image</span> <span class="o">=</span> <span class="n">diffusion</span><span class="o">.</span><span class="n">p_sample</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">image</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">t_index</span><span class="p">)</span></code></pre>
+</div><p>DDIM 版本只遍历一个子序列，见后文。</p>
+<h2 id="unet"><span class="h2-num" aria-hidden="true">03</span>U-Net 结构 <a class="heading-anchor" href="#unet" aria-label="本节永久链接" title="本节链接">#</a></h2><p>DDPM 的骨干不是“任意 CNN”，而是一个带时间条件、带跳跃连接、多分辨率的 U-Net。它要同时完成两件事：</p>
+<ol>
+<li>在不同尺度上识别“哪些是信号、哪些是噪声”；</li>
+<li>根据当前噪声级别 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>t</mi></mrow><annotation encoding="application/x-tex">t</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6151em;"></span><span class="mord mathnormal">t</span></span></span></span></span>，决定去噪的力度。</li>
+</ol>
+<figure class="article-figure figure--wide" id="fig-unet">
+<a class="zoom-link" href="images/unet.svg" data-caption="DDPM U-Net 的编码器、瓶颈、解码器与跳跃连接。">
+<img src="images/unet.svg" alt="U-Net 结构图：左侧编码器逐级下采样，中间瓶颈，右侧解码器逐级上采样，橙色虚线为跳跃连接" width="1300" height="650" loading="lazy" decoding="async">
+</a>
+<figcaption><span class="fig-no">图 2</span>U-Net 的编码器—瓶颈—解码器结构。每个分辨率级包含残差块与注意力；跳跃连接把编码器的细节直接送到解码器。图中以 64×64 输入、四级通道倍数为例。<span class="fig-source">笔记重绘</span></figcaption>
+</figure>
+<p>以 <code>dim=32, dim_mults=(1,2,4,8)</code>、64×64 输入为例：</p>
+<div class="table-wrap"><table class="paper-table"><thead>
+<tr>
+<th>阶段</th>
+<th>分辨率</th>
+<th>通道</th>
+<th>主要操作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>输入</td>
+<td>64×64</td>
+<td>3</td>
+<td>1×1 卷积升维</td>
+</tr>
+<tr>
+<td>编码 L1</td>
+<td>64×64</td>
+<td>32</td>
+<td>ResBlock ×2 + LinearAttention</td>
+</tr>
+<tr>
+<td>编码 L2</td>
+<td>32×32</td>
+<td>64</td>
+<td>ResBlock ×2 + LinearAttention</td>
+</tr>
+<tr>
+<td>编码 L3</td>
+<td>16×16</td>
+<td>128</td>
+<td>ResBlock ×2 + LinearAttention</td>
+</tr>
+<tr>
+<td>瓶颈</td>
+<td>8×8</td>
+<td>256</td>
+<td>ResBlock ×2 + SelfAttention</td>
+</tr>
+<tr>
+<td>解码 L3</td>
+<td>16×16</td>
+<td>128</td>
+<td>拼接 skip + ResBlock ×2</td>
+</tr>
+<tr>
+<td>解码 L2</td>
+<td>32×32</td>
+<td>64</td>
+<td>拼接 skip + ResBlock ×2</td>
+</tr>
+<tr>
+<td>解码 L1</td>
+<td>64×64</td>
+<td>32</td>
+<td>拼接 skip + ResBlock ×2</td>
+</tr>
+<tr>
+<td>输出</td>
+<td>64×64</td>
+<td>3</td>
+<td>1×1 卷积</td>
+</tr>
+</tbody>
+</table></div><p>默认的 <code>dim_mults=(1,2,4)</code> 少一级下采样，瓶颈在 16×16；图里展示的是博客/论文常用的四级配置。两者结构相同，只是级数不同。</p>
+<h3 id="残差块与条件归一化">残差块与条件归一化 <a class="heading-anchor" href="#残差块与条件归一化" aria-label="本节永久链接" title="本节链接">#</a></h3><p>每个 <code>ResnetBlock</code> 由两个 <code>Block</code> 组成，每个 <code>Block</code> 是：</p>
+<div class="code-block" role="group" aria-label="Text 代码示例">
+<div class="code-head"><span class="code-lang">Text</span><span class="code-actions"></span></div>
+<pre class="code-body"><code class="language-text">weight-standardized 3×3 conv → GroupNorm → 可选 scale/shift → SiLU</code></pre>
+</div><p>GroupNorm 不依赖 batch 大小，特别适合 DDPM 这种 batch 可能很小、又不想让归一化统计量随 batch 波动的场景。U-Net 里没有 BatchNorm，因此训练和采样的行为一致，也不需要维护 running statistics。</p>
+<p>残差连接保证深层网络仍然容易优化：</p>
+<div class="code-block" role="group" aria-label="Python 代码示例">
+<div class="code-head"><span class="code-lang">Python</span><span class="code-actions"></span></div>
+<pre class="code-body"><code class="language-python"><span class="n">h</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">block1</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">scale_shift</span><span class="o">=</span><span class="n">scale_shift</span><span class="p">)</span>
+<span class="n">h</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">block2</span><span class="p">(</span><span class="n">h</span><span class="p">)</span>
+<span class="k">return</span> <span class="n">h</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">res_conv</span><span class="p">(</span><span class="n">x</span><span class="p">)</span></code></pre>
+</div><h3 id="权重标准化">权重标准化 <a class="heading-anchor" href="#权重标准化" aria-label="本节永久链接" title="本节链接">#</a></h3><p>普通卷积的权重直接参与卷积；weight-standardized conv 先对每个输出通道的权重做标准化：</p>
+<div class="math-display math-display--split" role="math"><div class="math-scroll"><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><msub><mover accent="true"><mi mathvariant="bold">w</mi><mo>^</mo></mover><mi>o</mi></msub><mo>=</mo><mfrac><mrow><msub><mi mathvariant="bold">w</mi><mi>o</mi></msub><mo>−</mo><msub><mi>μ</mi><mi>o</mi></msub></mrow><msqrt><mrow><msubsup><mi>σ</mi><mi>o</mi><mn>2</mn></msubsup><mo>+</mo><mi>ϵ</mi></mrow></msqrt></mfrac></mrow><annotation encoding="application/x-tex">\hat{\mathbf{w}}_o
+=
+\frac{\mathbf{w}_o-\mu_o}{\sqrt{\sigma_o^2+\epsilon}}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8579em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord accent"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.7079em;"><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord mathbf" style="margin-right:0.01597em;">w</span></span><span style="top:-3.0134em;"><span class="pstrut" style="height:3em;"></span><span class="accent-body" style="left:-0.1667em;"><span class="mord">^</span></span></span></span></span></span></span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-left:-0.016em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">o</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:2.3903em;vertical-align:-1.13em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.2603em;"><span style="top:-2.1784em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord sqrt"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.9316em;"><span class="svg-align" style="top:-3.2em;"><span class="pstrut" style="height:3.2em;"></span><span class="mord" style="padding-left:1em;"><span class="mord"><span class="mord mathnormal" style="margin-right:0.03588em;">σ</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.7401em;"><span style="top:-2.453em;margin-left:-0.0359em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">o</span></span></span><span style="top:-2.989em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.247em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord mathnormal">ϵ</span></span></span><span style="top:-2.8916em;"><span class="pstrut" style="height:3.2em;"></span><span class="hide-tail" style="min-width:1.02em;height:1.28em;"><svg xmlns="http://www.w3.org/2000/svg" width="400em" height="1.28em" viewBox="0 0 400000 1296" preserveAspectRatio="xMinYMin slice"><path d="M263,681c0.7,0,18,39.7,52,119
+c34,79.3,68.167,158.7,102.5,238c34.3,79.3,51.8,119.3,52.5,120
+c340,-704.7,510.7,-1060.3,512,-1067
+l0 -0
+c4.7,-7.3,11,-11,19,-11
+H40000v40H1012.3
+s-271.3,567,-271.3,567c-38.7,80.7,-84,175,-136,283c-52,108,-89.167,185.3,-111.5,232
+c-22.3,46.7,-33.8,70.3,-34.5,71c-4.7,4.7,-12.3,7,-23,7s-12,-1,-12,-1
+s-109,-253,-109,-253c-72.7,-168,-109.3,-252,-110,-252c-10.7,8,-22,16.7,-34,26
+c-22,17.3,-33.3,26,-34,26s-26,-26,-26,-26s76,-59,76,-59s76,-60,76,-60z
+M1001 80h400000v40h-400000z"/></svg></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.3084em;"><span></span></span></span></span></span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.677em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord"><span class="mord mathbf" style="margin-right:0.01597em;">w</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-left:-0.016em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">o</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord"><span class="mord mathnormal">μ</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">o</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:1.13em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span></span></span></span></span></div></div>
+<p>然后再做卷积。它起到类似 BatchNorm 的“稳定尺度”作用，但<strong>不依赖 batch 统计</strong>，也不会在训练/采样之间产生行为差异。实现里对每个输出通道在 <code>(in_channels, kH, kW)</code> 上求均值和方差，<code>eps</code> 防止除零。</p>
+<h3 id="下采样与上采样">下采样与上采样 <a class="heading-anchor" href="#下采样与上采样" aria-label="本节永久链接" title="本节链接">#</a></h3><p>编码器用 2×2 像素重排（space-to-depth）加 1×1 卷积做下采样，而不是 stride-2 卷积：</p>
+<div class="code-block" role="group" aria-label="Python 代码示例">
+<div class="code-head"><span class="code-lang">Python</span><span class="code-actions"></span></div>
+<pre class="code-body"><code class="language-python"><span class="n">Rearrange</span><span class="p">(</span><span class="s2">"b c (h p1) (w p2) -&gt; b (c p1 p2) h w"</span><span class="p">,</span> <span class="n">p1</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">p2</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">Conv2d</span><span class="p">(</span><span class="n">dim</span> <span class="o">*</span> <span class="mi">4</span><span class="p">,</span> <span class="n">dim_out</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span></code></pre>
+</div><p>这样下采样没有重叠、没有额外的平滑，信息损失更可控。解码器用最近邻上采样加 3×3 卷积；简单、稳定，也不会产生棋盘格伪影。</p>
+<h2 id="time"><span class="h2-num" aria-hidden="true">04</span>时间条件 <a class="heading-anchor" href="#time" aria-label="本节永久链接" title="本节链接">#</a></h2><p>同一个 U-Net 要在 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>t</mi><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">t=1</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6151em;"></span><span class="mord mathnormal">t</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">1</span></span></span></span></span> 和 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>t</mi><mo>=</mo><mn>1000</mn></mrow><annotation encoding="application/x-tex">t=1000</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6151em;"></span><span class="mord mathnormal">t</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">1000</span></span></span></span></span> 执行完全不同的去噪任务。时间 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>t</mi></mrow><annotation encoding="application/x-tex">t</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6151em;"></span><span class="mord mathnormal">t</span></span></span></span></span> 必须进入网络的每一层，而不是只在输入端拼一个标量。</p>
+<p>DDPM 使用正弦位置嵌入：</p>
+<div class="math-display math-display--split" role="math"><div class="math-scroll"><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mrow><mi mathvariant="normal">e</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">b</mi></mrow><mo stretchy="false">(</mo><mi>t</mi><msub><mo stretchy="false">)</mo><mi>i</mi></msub><mo>=</mo><mrow><mo fence="true">{</mo><mtable rowspacing="0.36em" columnalign="left left" columnspacing="1em"><mtr><mtd><mstyle scriptlevel="0" displaystyle="false"><mrow><mi>sin</mi><mo>⁡</mo><mo stretchy="false">(</mo><msub><mi>ω</mi><mi>i</mi></msub><mi>t</mi><mo stretchy="false">)</mo><mo separator="true">,</mo></mrow></mstyle></mtd><mtd><mstyle scriptlevel="0" displaystyle="false"><mrow><mi>i</mi><mo>&lt;</mo><mi>d</mi><mi mathvariant="normal">/</mi><mn>2</mn></mrow></mstyle></mtd></mtr><mtr><mtd><mstyle scriptlevel="0" displaystyle="false"><mrow><mi>cos</mi><mo>⁡</mo><mo stretchy="false">(</mo><msub><mi>ω</mi><mi>i</mi></msub><mi>t</mi><mo stretchy="false">)</mo><mo separator="true">,</mo></mrow></mstyle></mtd><mtd><mstyle scriptlevel="0" displaystyle="false"><mrow><mi>i</mi><mo>≥</mo><mi>d</mi><mi mathvariant="normal">/</mi><mn>2</mn></mrow></mstyle></mtd></mtr></mtable></mrow><mo separator="true">,</mo><mspace width="2em"/><msub><mi>ω</mi><mi>i</mi></msub><mo>=</mo><mi>exp</mi><mo>⁡</mo><mrow><mo fence="true">(</mo><mo>−</mo><mfrac><mrow><mi>log</mi><mo>⁡</mo><mn>10000</mn></mrow><mrow><mi>d</mi><mi mathvariant="normal">/</mi><mn>2</mn><mo>−</mo><mn>1</mn></mrow></mfrac><mi>i</mi><mo fence="true">)</mo></mrow></mrow><annotation encoding="application/x-tex">\mathrm{emb}(t)_i=
+\begin{cases}
+\sin(\omega_i t), &amp; i &lt; d/2\\
+\cos(\omega_i t), &amp; i \ge d/2
+\end{cases},
+\qquad
+\omega_i=\exp\left(-\frac{\log 10000}{d/2-1}i\right)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord"><span class="mord mathrm">emb</span></span><span class="mopen">(</span><span class="mord mathnormal">t</span><span class="mclose"><span class="mclose">)</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3117em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:3em;vertical-align:-1.25em;"></span><span class="minner"><span class="mopen delimcenter" style="top:0em;"><span class="delimsizing size4">{</span></span><span class="mord"><span class="mtable"><span class="col-align-l"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.69em;"><span style="top:-3.69em;"><span class="pstrut" style="height:3.008em;"></span><span class="mord"><span class="mop">sin</span><span class="mopen">(</span><span class="mord"><span class="mord mathnormal" style="margin-right:0.03588em;">ω</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3117em;"><span style="top:-2.55em;margin-left:-0.0359em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord mathnormal">t</span><span class="mclose">)</span><span class="mpunct">,</span></span></span><span style="top:-2.25em;"><span class="pstrut" style="height:3.008em;"></span><span class="mord"><span class="mop">cos</span><span class="mopen">(</span><span class="mord"><span class="mord mathnormal" style="margin-right:0.03588em;">ω</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3117em;"><span style="top:-2.55em;margin-left:-0.0359em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord mathnormal">t</span><span class="mclose">)</span><span class="mpunct">,</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:1.19em;"><span></span></span></span></span></span><span class="arraycolsep" style="width:1em;"></span><span class="col-align-l"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.69em;"><span style="top:-3.69em;"><span class="pstrut" style="height:3.008em;"></span><span class="mord"><span class="mord mathnormal">i</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">&lt;</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mord mathnormal">d</span><span class="mord">/2</span></span></span><span style="top:-2.25em;"><span class="pstrut" style="height:3.008em;"></span><span class="mord"><span class="mord mathnormal">i</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">≥</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mord mathnormal">d</span><span class="mord">/2</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:1.19em;"><span></span></span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mpunct">,</span><span class="mspace" style="margin-right:2em;"></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.03588em;">ω</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3117em;"><span style="top:-2.55em;margin-left:-0.0359em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:2.4em;vertical-align:-0.95em;"></span><span class="mop">exp</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="minner"><span class="mopen delimcenter" style="top:0em;"><span class="delimsizing size3">(</span></span><span class="mord">−</span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.3714em;"><span style="top:-2.314em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord mathnormal">d</span><span class="mord">/2</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord">1</span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.677em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mop">lo<span style="margin-right:0.01389em;">g</span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord">10000</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.936em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mord mathnormal">i</span><span class="mclose delimcenter" style="top:0em;"><span class="delimsizing size3">)</span></span></span></span></span></span></span></div></div>
+<p>然后过一个两层 MLP：</p>
+<div class="code-block" role="group" aria-label="Python 代码示例">
+<div class="code-head"><span class="code-lang">Python</span><span class="code-actions"></span></div>
+<pre class="code-body"><code class="language-python"><span class="bp">self</span><span class="o">.</span><span class="n">time_mlp</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Sequential</span><span class="p">(</span>
+    <span class="n">SinusoidalPositionEmbeddings</span><span class="p">(</span><span class="n">dim</span><span class="p">),</span>
+    <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">dim</span> <span class="o">*</span> <span class="mi">4</span><span class="p">),</span>
+    <span class="n">nn</span><span class="o">.</span><span class="n">GELU</span><span class="p">(),</span>
+    <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">dim</span> <span class="o">*</span> <span class="mi">4</span><span class="p">,</span> <span class="n">dim</span> <span class="o">*</span> <span class="mi">4</span><span class="p">),</span>
+<span class="p">)</span></code></pre>
+</div><p>得到的 <code>time_emb</code> 在每个 ResBlock 里被映射成两组通道数相同的向量，用于仿射变换：</p>
+<div class="code-block" role="group" aria-label="Python 代码示例">
+<div class="code-head"><span class="code-lang">Python</span><span class="code-actions"></span></div>
+<pre class="code-body"><code class="language-python"><span class="n">time_emb</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mlp</span><span class="p">(</span><span class="n">time_emb</span><span class="p">)[:,</span> <span class="p">:,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span>
+<span class="n">scale</span><span class="p">,</span> <span class="n">shift</span> <span class="o">=</span> <span class="n">time_emb</span><span class="o">.</span><span class="n">chunk</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">h</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">block1</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">scale_shift</span><span class="o">=</span><span class="p">(</span><span class="n">scale</span><span class="p">,</span> <span class="n">shift</span><span class="p">))</span></code></pre>
+</div><p>也就是：</p>
+<div class="math-display math-display--split" role="math"><div class="math-scroll"><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mi>h</mi><mo>←</mo><mi>h</mi><mo>⊙</mo><mo stretchy="false">(</mo><mn>1</mn><mo>+</mo><mrow><mi mathvariant="normal">s</mi><mi mathvariant="normal">c</mi><mi mathvariant="normal">a</mi><mi mathvariant="normal">l</mi><mi mathvariant="normal">e</mi></mrow><mo stretchy="false">)</mo><mo>+</mo><mrow><mi mathvariant="normal">s</mi><mi mathvariant="normal">h</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">f</mi><mi mathvariant="normal">t</mi></mrow></mrow><annotation encoding="application/x-tex">h \leftarrow h \odot (1+\mathrm{scale})+\mathrm{shift}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6944em;"></span><span class="mord mathnormal">h</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">←</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.7778em;vertical-align:-0.0833em;"></span><span class="mord mathnormal">h</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">⊙</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord">1</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord"><span class="mord mathrm">scale</span></span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6944em;"></span><span class="mord"><span class="mord mathrm">shift</span></span></span></span></span></span></div></div>
+<p>这比“把 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>t</mi></mrow><annotation encoding="application/x-tex">t</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6151em;"></span><span class="mord mathnormal">t</span></span></span></span></span> 拼到图像通道上”更有效：它直接调制每个残差块的归一化后激活，让不同噪声级别可以复用同一套卷积权重，只改变“去噪强度”。</p>
+<h2 id="attention"><span class="h2-num" aria-hidden="true">05</span>注意力与内存 <a class="heading-anchor" href="#attention" aria-label="本节永久链接" title="本节链接">#</a></h2><p>U-Net 在高分辨率层使用<strong>线性注意力</strong>，在瓶颈使用<strong>完整自注意力</strong>。这是显存和表达力的折中。</p>
+<ul>
+<li>完整自注意力：<span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>N</mi><mo>=</mo><mi>H</mi><mo>×</mo><mi>W</mi></mrow><annotation encoding="application/x-tex">N=H\times W</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.10903em;">N</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.7667em;vertical-align:-0.0833em;"></span><span class="mord mathnormal" style="margin-right:0.08125em;">H</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.13889em;">W</span></span></span></span></span> 个位置两两计算，复杂度 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>O</mi><mo stretchy="false">(</mo><msup><mi>N</mi><mn>2</mn></msup><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">O(N^2)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1.0641em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.02778em;">O</span><span class="mopen">(</span><span class="mord"><span class="mord mathnormal" style="margin-right:0.10903em;">N</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span><span class="mclose">)</span></span></span></span></span>；</li>
+<li>线性注意力：用核技巧把注意力写成全局上下文，复杂度 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>O</mi><mo stretchy="false">(</mo><mi>N</mi><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">O(N)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.02778em;">O</span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.10903em;">N</span><span class="mclose">)</span></span></span></span></span>。</li>
+</ul>
+<p>在 64×64 输入、16×16 特征图上，<span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>N</mi><mo>=</mo><mn>256</mn></mrow><annotation encoding="application/x-tex">N=256</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.10903em;">N</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">256</span></span></span></span></span>，完整注意力还可接受；到 64×64 的 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>N</mi><mo>=</mo><mn>4096</mn></mrow><annotation encoding="application/x-tex">N=4096</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.10903em;">N</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">4096</span></span></span></span></span>，<span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>N</mi><mn>2</mn></msup></mrow><annotation encoding="application/x-tex">N^2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8141em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.10903em;">N</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span></span></span></span></span> 会迅速吃满显存。因此：</p>
+<ul>
+<li>编码/解码的高分辨率层：<code>LinearAttention</code>；</li>
+<li>中间的 8×8 或 16×16 瓶颈：<code>Attention</code>；</li>
+<li>每个注意力都包在 <code>PreNorm</code> + <code>Residual</code> 里，保证稳定。</li>
+</ul>
+<p>代码在 <code>src/dppm/model/attention.py</code>。如果显存不足，优先减少高分辨率层的通道数或注意力头数，而不是直接去掉所有注意力。</p>
+<h2 id="optimization"><span class="h2-num" aria-hidden="true">06</span>损失、优化与稳定性 <a class="heading-anchor" href="#optimization" aria-label="本节永久链接" title="本节链接">#</a></h2><h3 id="损失函数">损失函数 <a class="heading-anchor" href="#损失函数" aria-label="本节永久链接" title="本节链接">#</a></h3><p>数学篇式 (13) 是均方误差。工程实现通常提供 L1、L2、Huber 三种：</p>
+<div class="code-block" role="group" aria-label="Python 代码示例">
+<div class="code-head"><span class="code-lang">Python</span><span class="code-actions"></span></div>
+<pre class="code-body"><code class="language-python"><span class="k">if</span> <span class="n">loss_type</span> <span class="o">==</span> <span class="s2">"l1"</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">F</span><span class="o">.</span><span class="n">l1_loss</span><span class="p">(</span><span class="n">noise</span><span class="p">,</span> <span class="n">predicted_noise</span><span class="p">)</span>
+<span class="k">if</span> <span class="n">loss_type</span> <span class="o">==</span> <span class="s2">"l2"</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">F</span><span class="o">.</span><span class="n">mse_loss</span><span class="p">(</span><span class="n">noise</span><span class="p">,</span> <span class="n">predicted_noise</span><span class="p">)</span>
+<span class="k">if</span> <span class="n">loss_type</span> <span class="o">==</span> <span class="s2">"huber"</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">F</span><span class="o">.</span><span class="n">smooth_l1_loss</span><span class="p">(</span><span class="n">noise</span><span class="p">,</span> <span class="n">predicted_noise</span><span class="p">)</span></code></pre>
+</div><p>Huber 在误差较小时近似 L2、误差较大时近似 L1，对异常值和训练早期的大误差更稳健。博客和本实现默认使用 Huber；如果数据干净、训练稳定，L2 也完全可用。</p>
+<h3 id="梯度裁剪">梯度裁剪 <a class="heading-anchor" href="#梯度裁剪" aria-label="本节永久链接" title="本节链接">#</a></h3><p>DDPM 的训练损失在 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>t</mi></mrow><annotation encoding="application/x-tex">t</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6151em;"></span><span class="mord mathnormal">t</span></span></span></span></span> 很大时可能更大，早期梯度尺度不稳定。默认裁剪：</p>
+<div class="code-block" role="group" aria-label="Python 代码示例">
+<div class="code-head"><span class="code-lang">Python</span><span class="code-actions"></span></div>
+<pre class="code-body"><code class="language-python"><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">clip_grad_norm_</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="mf">1.0</span><span class="p">)</span></code></pre>
+</div><p>这不是 DDPM 数学的一部分，而是深度网络训练的常规稳定化手段。裁剪阈值太大等于没裁，太小会让学习变慢；1.0 是一个安全的起点。</p>
+<h3 id="优化器与学习率">优化器与学习率 <a class="heading-anchor" href="#优化器与学习率" aria-label="本节永久链接" title="本节链接">#</a></h3><p>博客使用 AdamW、学习率 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>2</mn><mo>×</mo><mn>1</mn><msup><mn>0</mn><mrow><mo>−</mo><mn>4</mn></mrow></msup></mrow><annotation encoding="application/x-tex">2\times10^{-4}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">2</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.8141em;"></span><span class="mord">1</span><span class="mord"><span class="mord">0</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">−</span><span class="mord mtight">4</span></span></span></span></span></span></span></span></span></span></span></span></span>。DDPM 对学习率比较敏感：太大容易在早期出现噪声预测的震荡，太小则收敛慢。CPU 小模型可以先用 <code>2e-4</code>；如果 loss 长期不降，先检查数据范围和损失类型，再考虑调学习率。</p>
+<h3 id="混合精度">混合精度 <a class="heading-anchor" href="#混合精度" aria-label="本节永久链接" title="本节链接">#</a></h3><p>GPU 上可以用 <code>torch.autocast</code> + <code>GradScaler</code> 把大部分矩阵运算放到 fp16/bf16，显著减少显存、提高吞吐。CPU 默认仍是 fp32；部分 CPU 支持 bfloat16，但收益依硬件而定，不建议作为默认。</p>
+<p>当前 <code>code/DDPM</code> 为了 CPU 可复现性，默认不启用 AMP。若迁移到 GPU，建议：</p>
+<div class="code-block" role="group" aria-label="Python 代码示例">
+<div class="code-head"><span class="code-lang">Python</span><span class="code-actions"></span></div>
+<pre class="code-body"><code class="language-python"><span class="n">scaler</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">amp</span><span class="o">.</span><span class="n">GradScaler</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">autocast</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">):</span>
+    <span class="n">loss</span> <span class="o">=</span> <span class="n">diffusion</span><span class="o">.</span><span class="n">p_losses</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">images</span><span class="p">,</span> <span class="n">timesteps</span><span class="p">)</span>
+<span class="n">scaler</span><span class="o">.</span><span class="n">scale</span><span class="p">(</span><span class="n">loss</span><span class="p">)</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
+<span class="n">scaler</span><span class="o">.</span><span class="n">step</span><span class="p">(</span><span class="n">optimizer</span><span class="p">)</span>
+<span class="n">scaler</span><span class="o">.</span><span class="n">update</span><span class="p">()</span></code></pre>
+</div><p>注意：AMP 只改变计算精度，不改变噪声调度；采样时通常也用 autocast，但要确保 <code>sqrt</code>、<code>exp</code> 等操作在稳定范围内。</p>
+<h2 id="data"><span class="h2-num" aria-hidden="true">07</span>数据管线 <a class="heading-anchor" href="#data" aria-label="本节永久链接" title="本节链接">#</a></h2><p>DDPM 对数据范围很敏感。前向过程假设数据大致零中心、单位方差，逆向过程从标准高斯出发，因此训练图像通常缩放到 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false">[</mo><mo>−</mo><mn>1</mn><mo separator="true">,</mo><mn>1</mn><mo stretchy="false">]</mo></mrow><annotation encoding="application/x-tex">[-1,1]</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">[</span><span class="mord">−</span><span class="mord">1</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord">1</span><span class="mclose">]</span></span></span></span></span>：</p>
+<div class="code-block" role="group" aria-label="Python 代码示例">
+<div class="code-head"><span class="code-lang">Python</span><span class="code-actions"></span></div>
+<pre class="code-body"><code class="language-python"><span class="n">transforms</span><span class="o">.</span><span class="n">Compose</span><span class="p">([</span>
+    <span class="n">transforms</span><span class="o">.</span><span class="n">Resize</span><span class="p">(</span><span class="n">image_size</span><span class="p">,</span> <span class="n">antialias</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+    <span class="n">transforms</span><span class="o">.</span><span class="n">CenterCrop</span><span class="p">(</span><span class="n">image_size</span><span class="p">),</span>
+    <span class="n">transforms</span><span class="o">.</span><span class="n">RandomHorizontalFlip</span><span class="p">(),</span>
+    <span class="n">transforms</span><span class="o">.</span><span class="n">ToTensor</span><span class="p">(),</span>
+    <span class="n">transforms</span><span class="o">.</span><span class="n">Normalize</span><span class="p">([</span><span class="mf">0.5</span><span class="p">]</span> <span class="o">*</span> <span class="n">channels</span><span class="p">,</span> <span class="p">[</span><span class="mf">0.5</span><span class="p">]</span> <span class="o">*</span> <span class="n">channels</span><span class="p">),</span>
+<span class="p">])</span></code></pre>
+</div><p><code>ToTensor</code> 把 PIL 图像变成 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false">[</mo><mn>0</mn><mo separator="true">,</mo><mn>1</mn><mo stretchy="false">]</mo></mrow><annotation encoding="application/x-tex">[0,1]</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">[</span><span class="mord">0</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord">1</span><span class="mclose">]</span></span></span></span></span>，<code>Normalize(0.5, 0.5)</code> 再映射到 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false">[</mo><mo>−</mo><mn>1</mn><mo separator="true">,</mo><mn>1</mn><mo stretchy="false">]</mo></mrow><annotation encoding="application/x-tex">[-1,1]</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">[</span><span class="mord">−</span><span class="mord">1</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord">1</span><span class="mclose">]</span></span></span></span></span>。如果这里用了 ImageNet 均值方差，或者忘记归一化，模型会学到错误的噪声尺度，表现为采样发灰、对比度异常或完全失败。</p>
+<p>本实现支持四种数据源：</p>
+<div class="table-wrap"><table class="paper-table"><thead>
+<tr>
+<th>数据源</th>
+<th>参数</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>合成形状</td>
+<td><code>--source synthetic</code></td>
+<td>无需下载，适合烟雾测试</td>
+</tr>
+<tr>
+<td>本地图片</td>
+<td><code>--source imagefolder --data-dir ...</code></td>
+<td>每个子目录一类</td>
+</tr>
+<tr>
+<td>CIFAR-10</td>
+<td><code>--source cifar10 --cifar-root data</code></td>
+<td>可用 <code>--download</code></td>
+</tr>
+<tr>
+<td>HuggingFace</td>
+<td><code>--source hf --hf-dataset ...</code></td>
+<td>需要 <code>datasets</code>，可指定图像列名</td>
+</tr>
+</tbody>
+</table></div><p>CPU 默认 <code>num_workers=0</code>，避免多进程开销；GPU 或大数据集可以增大。<code>DataLoader</code> 使用固定 <code>generator</code>，配合 <code>set_seed</code> 保证可复现。数据增强只做水平翻转；DDPM 对几何变换比较敏感，复杂的颜色抖动、裁剪会改变噪声分布。</p>
+<h2 id="ema"><span class="h2-num" aria-hidden="true">08</span>EMA 与检查点 <a class="heading-anchor" href="#ema" aria-label="本节永久链接" title="本节链接">#</a></h2><h3 id="为什么需要-ema">为什么需要 EMA <a class="heading-anchor" href="#为什么需要-ema" aria-label="本节永久链接" title="本节链接">#</a></h3><p>DDPM 的采样对权重扰动很敏感。训练后期的单步权重可能在某批数据上波动，直接用最后一步的权重采样，样本质量可能不如“最近一段时间权重的平均”。</p>
+<p>EMA 维护一份影子权重：</p>
+<div class="math-display math-display--split" role="math"><div class="math-scroll"><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><msub><mi>θ</mi><mrow><mi mathvariant="normal">e</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">a</mi></mrow></msub><mo>←</mo><mi>β</mi><mtext> </mtext><msub><mi>θ</mi><mrow><mi mathvariant="normal">e</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">a</mi></mrow></msub><mo>+</mo><mo stretchy="false">(</mo><mn>1</mn><mo>−</mo><mi>β</mi><mo stretchy="false">)</mo><mtext> </mtext><mi>θ</mi></mrow><annotation encoding="application/x-tex">\theta_{\mathrm{ema}}
+\leftarrow
+\beta\,\theta_{\mathrm{ema}}
++(1-\beta)\,\theta</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8444em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.02778em;">θ</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-left:-0.0278em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight"><span class="mord mathrm mtight">ema</span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">←</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.8889em;vertical-align:-0.1944em;"></span><span class="mord mathnormal" style="margin-right:0.05278em;">β</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.02778em;">θ</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-left:-0.0278em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight"><span class="mord mathrm mtight">ema</span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord">1</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.05278em;">β</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.02778em;">θ</span></span></span></span></span></div><span class="math-tag">(1)</span></div>
+<p><code>beta=0.9999</code> 时，有效平均窗口约 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>1</mn><mi mathvariant="normal">/</mi><mo stretchy="false">(</mo><mn>1</mn><mo>−</mo><mi>β</mi><mo stretchy="false">)</mo><mo>=</mo><mn>10000</mn></mrow><annotation encoding="application/x-tex">1/(1-\beta)=10000</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">1/</span><span class="mopen">(</span><span class="mord">1</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.05278em;">β</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">10000</span></span></span></span></span> 步。训练步数很少时，EMA 会严重滞后于当前模型，此时可以降低 <code>beta</code> 或关闭 EMA；本仓库的烟雾测试用 <code>0.9</code>，只是为了让两步训练也能产生有效预览。</p>
+<div class="code-block" role="group" aria-label="Python 代码示例">
+<div class="code-head"><span class="code-lang">Python</span><span class="code-actions"></span></div>
+<pre class="code-body"><code class="language-python"><span class="k">for</span> <span class="n">ema_parameter</span><span class="p">,</span> <span class="n">parameter</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">()):</span>
+    <span class="n">ema_parameter</span><span class="o">.</span><span class="n">mul_</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">beta</span><span class="p">)</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span>
+        <span class="n">parameter</span><span class="o">.</span><span class="n">detach</span><span class="p">(),</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">1.0</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">beta</span>
+    <span class="p">)</span></code></pre>
+</div><p>采样时优先用 EMA 权重；训练日志里也可以同时记录原始模型和 EMA 模型的预览，判断 EMA 是否真的带来提升。</p>
+<h3 id="检查点里应该有什么">检查点里应该有什么 <a class="heading-anchor" href="#检查点里应该有什么" aria-label="本节永久链接" title="本节链接">#</a></h3><p>一个可续训、可直接采样的检查点至少包含：</p>
+<ul>
+<li><code>model</code>：U-Net 权重；</li>
+<li><code>ema</code>：EMA 影子权重（可选）；</li>
+<li><code>optimizer</code>：优化器状态；</li>
+<li><code>model_config</code> / <code>diffusion_config</code> / <code>data_config</code>：重建模型和采样所需配置；</li>
+<li><code>epoch</code> / <code>step</code>：续训位置；</li>
+<li><code>format</code>：检查点版本。</li>
+</ul>
+<p>只保存 <code>model.state_dict()</code> 是不够的：采样时不知道 <code>dim_mults</code>、图像尺寸、噪声调度，就无法重建网络和扩散过程。<code>sample.py</code> 会从检查点读取这些配置，而不是要求用户重新输入。</p>
+<p>检查点通过 <code>torch.load(..., weights_only=False)</code> 读取，因为里面包含配置字典。<strong>只加载自己信任的检查点</strong>；不要加载来源不明的 <code>.pt</code> 文件。</p>
+<h2 id="sampling"><span class="h2-num" aria-hidden="true">09</span>采样加速：DDPM 与 DDIM <a class="heading-anchor" href="#sampling" aria-label="本节永久链接" title="本节链接">#</a></h2><p>DDPM 的祖先采样需要 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>T</mi></mrow><annotation encoding="application/x-tex">T</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.13889em;">T</span></span></span></span></span> 次网络前向。默认 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>T</mi><mo>=</mo><mn>1000</mn></mrow><annotation encoding="application/x-tex">T=1000</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.13889em;">T</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">1000</span></span></span></span></span>，在 CPU 上很慢；即使 GPU，1000 步也是明显的延迟。</p>
+<p>DDIM 的核心是：不要求逆向过程必须是马尔可夫链，而是构造一条与训练目标一致的确定性（或半随机）轨迹。它只取 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>T</mi></mrow><annotation encoding="application/x-tex">T</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.13889em;">T</span></span></span></span></span> 步中的一个子序列：</p>
+<div class="math-display math-display--split" role="math"><div class="math-scroll"><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><msub><mi mathvariant="bold">x</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>=</mo><msqrt><msub><mover accent="true"><mi>α</mi><mo>ˉ</mo></mover><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub></msqrt><mtext> </mtext><msub><mover accent="true"><mi mathvariant="bold">x</mi><mo>^</mo></mover><mn>0</mn></msub><mo>+</mo><msqrt><mrow><mn>1</mn><mo>−</mo><msub><mover accent="true"><mi>α</mi><mo>ˉ</mo></mover><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>−</mo><msubsup><mi>σ</mi><mi>t</mi><mn>2</mn></msubsup></mrow></msqrt><mtext> </mtext><msub><mi mathvariant="bold-italic">ϵ</mi><mi>θ</mi></msub><mo>+</mo><msub><mi>σ</mi><mi>t</mi></msub><mi mathvariant="bold">z</mi></mrow><annotation encoding="application/x-tex">\mathbf{x}_{t-1}
+=
+\sqrt{\bar\alpha_{t-1}}\,\hat{\mathbf{x}}_0
++
+\sqrt{1-\bar\alpha_{t-1}-\sigma_t^2}\,\boldsymbol{\epsilon}_\theta
++
+\sigma_t\mathbf{z}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6528em;vertical-align:-0.2083em;"></span><span class="mord"><span class="mord mathbf">x</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">t</span><span class="mbin mtight">−</span><span class="mord mtight">1</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2083em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1.04em;vertical-align:-0.2264em;"></span><span class="mord sqrt"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.8136em;"><span class="svg-align" style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord" style="padding-left:0.833em;"><span class="mord"><span class="mord accent"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.5678em;"><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord mathnormal" style="margin-right:0.0037em;">α</span></span><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="accent-body" style="left:-0.2222em;"><span class="mord">ˉ</span></span></span></span></span></span></span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:-0.0037em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">t</span><span class="mbin mtight">−</span><span class="mord mtight">1</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2083em;"><span></span></span></span></span></span></span></span></span><span style="top:-2.7736em;"><span class="pstrut" style="height:3em;"></span><span class="hide-tail" style="min-width:0.853em;height:1.08em;"><svg xmlns="http://www.w3.org/2000/svg" width="400em" height="1.08em" viewBox="0 0 400000 1080" preserveAspectRatio="xMinYMin slice"><path d="M95,702
+c-2.7,0,-7.17,-2.7,-13.5,-8c-5.8,-5.3,-9.5,-10,-9.5,-14
+c0,-2,0.3,-3.3,1,-4c1.3,-2.7,23.83,-20.7,67.5,-54
+c44.2,-33.3,65.8,-50.3,66.5,-51c1.3,-1.3,3,-2,5,-2c4.7,0,8.7,3.3,12,10
+s173,378,173,378c0.7,0,35.3,-71,104,-213c68.7,-142,137.5,-285,206.5,-429
+c69,-144,104.5,-217.7,106.5,-221
+l0 -0
+c5.3,-9.3,12,-14,20,-14
+H400000v40H845.2724
+s-225.272,467,-225.272,467s-235,486,-235,486c-2.7,4.7,-9,7,-19,7
+c-6,0,-10,-1,-12,-3s-194,-422,-194,-422s-65,47,-65,47z
+M834 80h400000v40h-400000z"/></svg></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2264em;"><span></span></span></span></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord"><span class="mord accent"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.7079em;"><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord mathbf">x</span></span><span style="top:-3.0134em;"><span class="pstrut" style="height:3em;"></span><span class="accent-body" style="left:-0.2222em;"><span class="mord">^</span></span></span></span></span></span></span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">0</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1.84em;vertical-align:-0.531em;"></span><span class="mord sqrt"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.309em;"><span class="svg-align" style="top:-3.8em;"><span class="pstrut" style="height:3.8em;"></span><span class="mord" style="padding-left:1em;"><span class="mord">1</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord"><span class="mord accent"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.5678em;"><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord mathnormal" style="margin-right:0.0037em;">α</span></span><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="accent-body" style="left:-0.2222em;"><span class="mord">ˉ</span></span></span></span></span></span></span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:-0.0037em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">t</span><span class="mbin mtight">−</span><span class="mord mtight">1</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2083em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.03588em;">σ</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.7959em;"><span style="top:-2.4542em;margin-left:-0.0359em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span><span style="top:-3.0448em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2458em;"><span></span></span></span></span></span></span></span></span><span style="top:-3.269em;"><span class="pstrut" style="height:3.8em;"></span><span class="hide-tail" style="min-width:1.02em;height:1.88em;"><svg xmlns="http://www.w3.org/2000/svg" width="400em" height="1.88em" viewBox="0 0 400000 1944" preserveAspectRatio="xMinYMin slice"><path d="M983 90
+l0 -0
+c4,-6.7,10,-10,18,-10 H400000v40
+H1013.1s-83.4,268,-264.1,840c-180.7,572,-277,876.3,-289,913c-4.7,4.7,-12.7,7,-24,7
+s-12,0,-12,0c-1.3,-3.3,-3.7,-11.7,-7,-25c-35.3,-125.3,-106.7,-373.3,-214,-744
+c-10,12,-21,25,-33,39s-32,39,-32,39c-6,-5.3,-15,-14,-27,-26s25,-30,25,-30
+c26.7,-32.7,52,-63,76,-91s52,-60,52,-60s208,722,208,722
+c56,-175.3,126.3,-397.3,211,-666c84.7,-268.7,153.8,-488.2,207.5,-658.5
+c53.7,-170.3,84.5,-266.8,92.5,-289.5z
+M1001 80h400000v40h-400000z"/></svg></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.531em;"><span></span></span></span></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord"><span class="mord"><span class="mord"><span class="mord boldsymbol">ϵ</span></span></span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right:0.02778em;">θ</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.5944em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.03588em;">σ</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.0359em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord mathbf">z</span></span></span></span></span></div><span class="math-tag">(2)</span></div>
+<p>其中</p>
+<div class="math-display math-display--split" role="math"><div class="math-scroll"><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><msub><mover accent="true"><mi mathvariant="bold">x</mi><mo>^</mo></mover><mn>0</mn></msub><mo>=</mo><mfrac><mrow><msub><mi mathvariant="bold">x</mi><mi>t</mi></msub><mo>−</mo><msqrt><mrow><mn>1</mn><mo>−</mo><msub><mover accent="true"><mi>α</mi><mo>ˉ</mo></mover><mi>t</mi></msub></mrow></msqrt><mtext> </mtext><msub><mi mathvariant="bold-italic">ϵ</mi><mi>θ</mi></msub></mrow><msqrt><msub><mover accent="true"><mi>α</mi><mo>ˉ</mo></mover><mi>t</mi></msub></msqrt></mfrac></mrow><annotation encoding="application/x-tex">\hat{\mathbf{x}}_0
+=
+\frac{\mathbf{x}_t-\sqrt{1-\bar\alpha_t}\,\boldsymbol{\epsilon}_\theta}
+{\sqrt{\bar\alpha_t}}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8579em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord accent"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.7079em;"><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord mathbf">x</span></span><span style="top:-3.0134em;"><span class="pstrut" style="height:3em;"></span><span class="accent-body" style="left:-0.2222em;"><span class="mord">^</span></span></span></span></span></span></span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">0</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:2.4413em;vertical-align:-0.9321em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.5092em;"><span style="top:-2.314em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord sqrt"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.7939em;"><span class="svg-align" style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord" style="padding-left:0.833em;"><span class="mord"><span class="mord accent"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.5678em;"><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord mathnormal" style="margin-right:0.0037em;">α</span></span><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="accent-body" style="left:-0.2222em;"><span class="mord">ˉ</span></span></span></span></span></span></span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.0037em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span><span style="top:-2.7539em;"><span class="pstrut" style="height:3em;"></span><span class="hide-tail" style="min-width:0.853em;height:1.08em;"><svg xmlns="http://www.w3.org/2000/svg" width="400em" height="1.08em" viewBox="0 0 400000 1080" preserveAspectRatio="xMinYMin slice"><path d="M95,702
+c-2.7,0,-7.17,-2.7,-13.5,-8c-5.8,-5.3,-9.5,-10,-9.5,-14
+c0,-2,0.3,-3.3,1,-4c1.3,-2.7,23.83,-20.7,67.5,-54
+c44.2,-33.3,65.8,-50.3,66.5,-51c1.3,-1.3,3,-2,5,-2c4.7,0,8.7,3.3,12,10
+s173,378,173,378c0.7,0,35.3,-71,104,-213c68.7,-142,137.5,-285,206.5,-429
+c69,-144,104.5,-217.7,106.5,-221
+l0 -0
+c5.3,-9.3,12,-14,20,-14
+H400000v40H845.2724
+s-225.272,467,-225.272,467s-235,486,-235,486c-2.7,4.7,-9,7,-19,7
+c-6,0,-10,-1,-12,-3s-194,-422,-194,-422s-65,47,-65,47z
+M834 80h400000v40h-400000z"/></svg></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2461em;"><span></span></span></span></span></span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.677em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord"><span class="mord mathbf">x</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord sqrt"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.8322em;"><span class="svg-align" style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord" style="padding-left:0.833em;"><span class="mord">1</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord"><span class="mord accent"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.5678em;"><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord mathnormal" style="margin-right:0.0037em;">α</span></span><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="accent-body" style="left:-0.2222em;"><span class="mord">ˉ</span></span></span></span></span></span></span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.0037em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span><span style="top:-2.7922em;"><span class="pstrut" style="height:3em;"></span><span class="hide-tail" style="min-width:0.853em;height:1.08em;"><svg xmlns="http://www.w3.org/2000/svg" width="400em" height="1.08em" viewBox="0 0 400000 1080" preserveAspectRatio="xMinYMin slice"><path d="M95,702
+c-2.7,0,-7.17,-2.7,-13.5,-8c-5.8,-5.3,-9.5,-10,-9.5,-14
+c0,-2,0.3,-3.3,1,-4c1.3,-2.7,23.83,-20.7,67.5,-54
+c44.2,-33.3,65.8,-50.3,66.5,-51c1.3,-1.3,3,-2,5,-2c4.7,0,8.7,3.3,12,10
+s173,378,173,378c0.7,0,35.3,-71,104,-213c68.7,-142,137.5,-285,206.5,-429
+c69,-144,104.5,-217.7,106.5,-221
+l0 -0
+c5.3,-9.3,12,-14,20,-14
+H400000v40H845.2724
+s-225.272,467,-225.272,467s-235,486,-235,486c-2.7,4.7,-9,7,-19,7
+c-6,0,-10,-1,-12,-3s-194,-422,-194,-422s-65,47,-65,47z
+M834 80h400000v40h-400000z"/></svg></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2078em;"><span></span></span></span></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord"><span class="mord"><span class="mord"><span class="mord boldsymbol">ϵ</span></span></span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right:0.02778em;">θ</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.9321em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span></span></span></span></span></div></div>
+<p>当 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>σ</mi><mi>t</mi></msub><mo>=</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">\sigma_t=0</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.5806em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.03588em;">σ</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.0359em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">0</span></span></span></span></span> 时，采样完全确定；给定同一个 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi mathvariant="bold">x</mi><mi>T</mi></msub></mrow><annotation encoding="application/x-tex">\mathbf{x}_T</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.5944em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathbf">x</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3283em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right:0.13889em;">T</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span></span>，输出固定。<code>eta</code> 控制随机性，<code>eta=0</code> 是最常用的确定性 DDIM。</p>
+<div class="code-block" role="group" aria-label="Python 代码示例">
+<div class="code-head"><span class="code-lang">Python</span><span class="code-actions"></span></div>
+<pre class="code-body"><code class="language-python"><span class="n">times</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">timesteps</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">steps</span><span class="p">)</span><span class="o">.</span><span class="n">round</span><span class="p">()</span><span class="o">.</span><span class="n">long</span><span class="p">()</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span>
+<span class="n">times</span> <span class="o">=</span> <span class="n">times</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">descending</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">values</span>
+
+<span class="k">for</span> <span class="n">position</span><span class="p">,</span> <span class="n">current</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">times</span><span class="p">):</span>
+    <span class="n">eps</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">t_tensor</span><span class="p">)</span>
+    <span class="n">x0</span> <span class="o">=</span> <span class="p">(</span><span class="n">image</span> <span class="o">-</span> <span class="n">sqrt</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">ab_t</span><span class="p">)</span> <span class="o">*</span> <span class="n">eps</span><span class="p">)</span> <span class="o">/</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">ab_t</span><span class="p">)</span>
+    <span class="n">x0</span> <span class="o">=</span> <span class="n">x0</span><span class="o">.</span><span class="n">clamp</span><span class="p">(</span><span class="o">-</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+    <span class="n">image</span> <span class="o">=</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">ab_prev</span><span class="p">)</span> <span class="o">*</span> <span class="n">x0</span> <span class="o">+</span> <span class="n">sqrt</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">ab_prev</span><span class="p">)</span> <span class="o">*</span> <span class="n">eps</span></code></pre>
+</div><div class="table-wrap"><table class="paper-table"><thead>
+<tr>
+<th>采样器</th>
+<th>网络前向次数</th>
+<th>随机性</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DDPM</td>
+<td><span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>T</mi></mrow><annotation encoding="application/x-tex">T</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.13889em;">T</span></span></span></span></span>（默认 1000）</td>
+<td>每步注入噪声</td>
+<td>论文算法复现、质量优先</td>
+</tr>
+<tr>
+<td>DDIM</td>
+<td>可配置（默认 50）</td>
+<td><code>eta=0</code> 时确定</td>
+<td>CPU 推理、快速预览、批量生成</td>
+</tr>
+</tbody>
+</table></div><p>DDIM 不是“免费加速”：步数太少时，离散化误差变大，细节会损失；50 步通常是质量和速度的折中，10–20 步适合预览。无论 DDPM 还是 DDIM，<strong>不同初始噪声仍然产生不同样本</strong>；确定性只表示“同一初始噪声对应同一输出”。</p>
+<h2 id="pitfalls"><span class="h2-num" aria-hidden="true">10</span>数值与性能陷阱 <a class="heading-anchor" href="#pitfalls" aria-label="本节永久链接" title="本节链接">#</a></h2><ol>
+<li><strong><span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>t</mi><mo>=</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">t=0</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6151em;"></span><span class="mord mathnormal">t</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">0</span></span></span></span></span> 的数值边界</strong>：后验方差在 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>t</mi><mo>=</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">t=0</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6151em;"></span><span class="mord mathnormal">t</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">0</span></span></span></span></span> 为 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>0</mn></mrow><annotation encoding="application/x-tex">0</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">0</span></span></span></span></span>，最后一步直接返回均值、不再加噪声；同时 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msqrt><mrow><mn>1</mn><mo>−</mo><msub><mover accent="true"><mi>α</mi><mo>ˉ</mo></mover><mi>t</mi></msub></mrow></msqrt></mrow><annotation encoding="application/x-tex">\sqrt{1-\bar\alpha_t}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1.04em;vertical-align:-0.2078em;"></span><span class="mord sqrt"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.8322em;"><span class="svg-align" style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord" style="padding-left:0.833em;"><span class="mord">1</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord"><span class="mord accent"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.5678em;"><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord mathnormal" style="margin-right:0.0037em;">α</span></span><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="accent-body" style="left:-0.2222em;"><span class="mord">ˉ</span></span></span></span></span></span></span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.0037em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span><span style="top:-2.7922em;"><span class="pstrut" style="height:3em;"></span><span class="hide-tail" style="min-width:0.853em;height:1.08em;"><svg xmlns="http://www.w3.org/2000/svg" width="400em" height="1.08em" viewBox="0 0 400000 1080" preserveAspectRatio="xMinYMin slice"><path d="M95,702
+c-2.7,0,-7.17,-2.7,-13.5,-8c-5.8,-5.3,-9.5,-10,-9.5,-14
+c0,-2,0.3,-3.3,1,-4c1.3,-2.7,23.83,-20.7,67.5,-54
+c44.2,-33.3,65.8,-50.3,66.5,-51c1.3,-1.3,3,-2,5,-2c4.7,0,8.7,3.3,12,10
+s173,378,173,378c0.7,0,35.3,-71,104,-213c68.7,-142,137.5,-285,206.5,-429
+c69,-144,104.5,-217.7,106.5,-221
+l0 -0
+c5.3,-9.3,12,-14,20,-14
+H400000v40H845.2724
+s-225.272,467,-225.272,467s-235,486,-235,486c-2.7,4.7,-9,7,-19,7
+c-6,0,-10,-1,-12,-3s-194,-422,-194,-422s-65,47,-65,47z
+M834 80h400000v40h-400000z"/></svg></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2078em;"><span></span></span></span></span></span></span></span></span></span> 很小，注意不要在这里引入无意义的除零或放大误差。</li>
+<li><strong>数据范围</strong>：训练用 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false">[</mo><mo>−</mo><mn>1</mn><mo separator="true">,</mo><mn>1</mn><mo stretchy="false">]</mo></mrow><annotation encoding="application/x-tex">[-1,1]</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">[</span><span class="mord">−</span><span class="mord">1</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord">1</span><span class="mclose">]</span></span></span></span></span>，保存时映射回 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false">[</mo><mn>0</mn><mo separator="true">,</mo><mn>1</mn><mo stretchy="false">]</mo></mrow><annotation encoding="application/x-tex">[0,1]</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">[</span><span class="mord">0</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord">1</span><span class="mclose">]</span></span></span></span></span>；如果训练用 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false">[</mo><mn>0</mn><mo separator="true">,</mo><mn>1</mn><mo stretchy="false">]</mo></mrow><annotation encoding="application/x-tex">[0,1]</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">[</span><span class="mord">0</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord">1</span><span class="mclose">]</span></span></span></span></span>，噪声尺度和输出范围都会错。</li>
+<li><strong>调度不一致</strong>：训练和采样必须使用同一个 <code>beta</code> 调度、同一个 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>T</mi></mrow><annotation encoding="application/x-tex">T</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.13889em;">T</span></span></span></span></span>。检查点里保存配置，采样时不要用命令行默认值覆盖。</li>
+<li><strong>过度裁剪 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mover accent="true"><mi mathvariant="bold">x</mi><mo>^</mo></mover><mn>0</mn></msub></mrow><annotation encoding="application/x-tex">\hat{\mathbf{x}}_0</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8579em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord accent"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.7079em;"><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord mathbf">x</span></span><span style="top:-3.0134em;"><span class="pstrut" style="height:3em;"></span><span class="accent-body" style="left:-0.2222em;"><span class="mord">^</span></span></span></span></span></span></span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">0</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span></span></strong>：DDIM 中把 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mover accent="true"><mi mathvariant="bold">x</mi><mo>^</mo></mover><mn>0</mn></msub></mrow><annotation encoding="application/x-tex">\hat{\mathbf{x}}_0</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8579em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord accent"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.7079em;"><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord mathbf">x</span></span><span style="top:-3.0134em;"><span class="pstrut" style="height:3em;"></span><span class="accent-body" style="left:-0.2222em;"><span class="mord">^</span></span></span></span></span></span></span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">0</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span></span> 裁到 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false">[</mo><mo>−</mo><mn>1</mn><mo separator="true">,</mo><mn>1</mn><mo stretchy="false">]</mo></mrow><annotation encoding="application/x-tex">[-1,1]</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">[</span><span class="mord">−</span><span class="mord">1</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord">1</span><span class="mclose">]</span></span></span></span></span> 可以稳定训练/采样，但会引入偏差；如果发现颜色饱和，尝试关闭或放宽裁剪。</li>
+<li><strong>BatchNorm</strong>：不要用 BatchNorm。小 batch 下统计量噪声大，训练/采样行为不一致；GroupNorm 更合适。</li>
+<li><strong>注意力显存</strong>：高分辨率用完整自注意力会 <span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>O</mi><mo stretchy="false">(</mo><msup><mi>N</mi><mn>2</mn></msup><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">O(N^2)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1.0641em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.02778em;">O</span><span class="mopen">(</span><span class="mord"><span class="mord mathnormal" style="margin-right:0.10903em;">N</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span><span class="mclose">)</span></span></span></span></span> 爆炸；用线性注意力，或把完整注意力限制在瓶颈。</li>
+<li><strong>EMA 滞后</strong>：训练步数少于平均窗口时，EMA 可能几乎没更新；短训练要降低 <code>beta</code>。</li>
+<li><strong>检查点配置漂移</strong>：续训时模型/扩散配置必须与检查点一致，否则加载权重会报错或产生错误结果。</li>
+<li><strong>CPU 线程/worker 过度订阅</strong>：<code>num_workers</code> 过大、<code>torch</code> 线程数过多会互相争抢；CPU 先用 <code>num_workers=0</code>。</li>
+<li><strong><code>torch.load</code> 安全</strong>：只加载可信检查点；不要把用户上传的 <code>.pt</code> 直接当配置读取。</li>
+</ol>
+<h2 id="code-map"><span class="h2-num" aria-hidden="true">11</span>代码地图与复现 <a class="heading-anchor" href="#code-map" aria-label="本节永久链接" title="本节链接">#</a></h2><div class="table-wrap"><table class="paper-table"><thead>
+<tr>
+<th>模块</th>
+<th>职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/dppm/config.py</code></td>
+<td>配置 dataclass、参数校验、JSON 序列化</td>
+</tr>
+<tr>
+<td><code>src/dppm/data.py</code></td>
+<td>合成数据、ImageFolder、CIFAR-10、HuggingFace、变换</td>
+</tr>
+<tr>
+<td><code>src/dppm/model/blocks.py</code></td>
+<td>残差、上下采样、时间嵌入、weight-standardized conv</td>
+</tr>
+<tr>
+<td><code>src/dppm/model/attention.py</code></td>
+<td>完整/线性注意力、PreNorm</td>
+</tr>
+<tr>
+<td><code>src/dppm/model/unet.py</code></td>
+<td>U-Net 组装与前向</td>
+</tr>
+<tr>
+<td><code>src/dppm/diffusion.py</code></td>
+<td>前向、损失、DDPM/DDIM 采样</td>
+</tr>
+<tr>
+<td><code>src/dppm/ema.py</code></td>
+<td>权重 EMA</td>
+</tr>
+<tr>
+<td><code>src/dppm/train.py</code></td>
+<td>训练循环、日志、检查点、预览</td>
+</tr>
+<tr>
+<td><code>src/dppm/sample.py</code></td>
+<td>检查点加载与图片生成</td>
+</tr>
+<tr>
+<td><code>src/dppm/cli.py</code></td>
+<td><code>train / sample / inspect / smoke</code></td>
+</tr>
+</tbody>
+</table></div><p>最小复现：</p>
+<div class="code-block" role="group" aria-label="Bash 代码示例">
+<div class="code-head"><span class="code-lang">Bash</span><span class="code-actions"></span></div>
+<pre class="code-body"><code class="language-bash"><span class="nb">cd</span><span class="w"> </span>code/DDPM
+uv<span class="w"> </span>sync
+<span class="nb">source</span><span class="w"> </span>.venv/bin/activate
+dppm<span class="w"> </span>smoke<span class="w"> </span>--output-dir<span class="w"> </span>runs/smoke</code></pre>
+</div><p><code>smoke</code> 用 32×32、<code>dim=16</code>、<code>dim_mults=(1,2)</code>、2 步训练和 2 步 DDIM，验证整条链路，而不是验证生成质量。默认 64×64 模型约 260 万参数，CPU 上可以训练小数据集；完整 Flowers/CIFAR 训练需要更长时间。</p>
+<h2 id="next"><span class="h2-num" aria-hidden="true">12</span>进一步优化 <a class="heading-anchor" href="#next" aria-label="本节永久链接" title="本节链接">#</a></h2><p>按收益/成本排序，可以考虑：</p>
+<ul>
+<li><strong>GPU + AMP</strong>：最直接的吞吐提升；注意用 <code>GradScaler</code>，并在采样时保持数值稳定。</li>
+<li><strong>DDIM / DPM-Solver</strong>：减少采样步数，尤其适合 CPU 或交互式预览。</li>
+<li><strong><code>torch.compile</code></strong>：对固定形状的 U-Net 可能有帮助，但首次编译和 CPU 收益因环境而异；先测再开。</li>
+<li><strong><code>channels_last</code></strong>：GPU 上卷积更友好；CPU 收益通常有限。</li>
+<li><strong>梯度累积</strong>：显存不足时模拟更大 batch；注意 EMA 更新频率和学习率缩放。</li>
+<li><strong>激活检查点</strong>：高分辨率/深 U-Net 训练时用计算换显存。</li>
+<li><strong>Latent Diffusion</strong>：把扩散搬到 VAE 潜空间，是高清生成的主流路线；本质仍是本文的 DDPM，只是数据空间换了。</li>
+<li><strong>条件生成</strong>：类别嵌入、文本 cross-attention、ControlNet；这会把“随机采样”变成“按需求生成”，但需要额外数据和结构。</li>
+</ul>
+<p>不要在数据、调度和损失还没对齐时就开始堆优化。DDPM 的很多“训练不收敛”其实是数据范围、噪声调度或检查点配置的问题。</p>
+<h2 id="summary"><span class="h2-num" aria-hidden="true">13</span>小结 <a class="heading-anchor" href="#summary" aria-label="本节永久链接" title="本节链接">#</a></h2><ul>
+<li><strong>U-Net</strong> 提供多尺度去噪能力；时间嵌入让同一套权重适配不同噪声级别。</li>
+<li><strong>GroupNorm + 权重标准化</strong> 让训练不依赖 batch 统计；<strong>线性注意力</strong>控制高分辨率显存。</li>
+<li><strong>Huber/MSE + 梯度裁剪 + AdamW</strong> 是稳定训练的基本组合；<strong>EMA</strong> 提升采样质量。</li>
+<li><strong>检查点</strong>必须保存模型、EMA、优化器和三份配置，才能可靠续训和采样。</li>
+<li><strong>DDIM</strong> 用更少步数近似同一条生成轨迹；<code>eta=0</code> 时确定性，适合 CPU。</li>
+<li>数值上最需要小心的是数据范围、<span class="math"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>t</mi><mo>=</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">t=0</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6151em;"></span><span class="mord mathnormal">t</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">0</span></span></span></span></span> 的除法、调度一致性和注意力显存。</li>
+</ul>
+<h2 id="further-reading"><span class="h2-num" aria-hidden="true">14</span>延伸阅读 <a class="heading-anchor" href="#further-reading" aria-label="本节永久链接" title="本节链接">#</a></h2><ul>
+<li><strong>数学篇</strong>：<a href="../ddpm-math/index.html">DDPM 的数学原理</a>。前向、后验、ELBO、score 与采样的完整推导。</li>
+<li><strong>译文</strong>：<a href="../ddpm/index.html">去噪扩散概率模型（DDPM）</a>。论文正文与实验。</li>
+<li><strong>DDIM</strong>：<a href="https://arxiv.org/abs/2010.02502" target="_blank" rel="noopener noreferrer">Denoising Diffusion Implicit Models</a>（Song 等，2021）。</li>
+<li><strong>Improved DDPM</strong>：<a href="https://arxiv.org/abs/2102.09672" target="_blank" rel="noopener noreferrer">Improved Denoising Diffusion Probabilistic Models</a>（Nichol &amp; Dhariwal，2021）。</li>
+<li><strong>Latent Diffusion</strong>：<a href="https://arxiv.org/abs/2112.10752" target="_blank" rel="noopener noreferrer">High-Resolution Image Synthesis with Latent Diffusion Models</a>（Rombach 等，2022）。</li>
+<li><strong>代码</strong>：本仓库的 <code>code/DDPM</code>，包含本文讨论的全部模块和 CLI。</li>
+</ul>
+
+
+        <nav class="series-nav" aria-label="论文系列导航">
+  <a class="series-link" href="../ddpm-math/index.html">
+    <span class="series-label">上一篇 · 003</span>
+    <span class="series-title">DDPM 的数学原理</span>
+  </a>
+  <a class="series-link series-link--next" href="../index.html">
+    <span class="series-label">论文库</span>
+    <span class="series-title">返回全部论文</span>
+    <span class="series-arrow" aria-hidden="true">→</span>
+  </a>
+</nav>
+
+        <footer class="article-footer">
+          <div class="end-mark" aria-hidden="true">· · ·</div>
+          <div class="source-card">
+            <p class="source-kicker">Source / 原文</p>
+            <p class="source-title">Engineering a Denoising Diffusion Probabilistic Model</p>
+            <p class="source-meta">Diffusion Model Notes · 代码笔记 · 2026 年 10 月</p>
+            <div class="source-actions"><a class="button button-primary" href="https://arxiv.org/abs/2006.11239" target="_blank" rel="noopener noreferrer">阅读原始论文 ↗</a>
+              <a class="button button-ghost" href="https://arxiv.org/pdf/2006.11239" target="_blank" rel="noopener noreferrer">下载 PDF ↗</a>
+              <a class="button button-ghost" href="https://github.com/hojonathanho/diffusion" target="_blank" rel="noopener noreferrer">官方实现 ↗</a></div>
+            <p class="disclaimer">本文为学习笔记。代码示例来自本仓库的 code/DDPM，论文与图表版权归原作者所有。 图片已本地化至 <code>images/</code>，公式由本地 KaTeX 预渲染，可离线阅读。</p>
+          </div>
+        </footer>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell footer-inner">
+      <div class="footer-brand">
+        <span class="brand-mark" aria-hidden="true">DM</span>
+        <span>Diffusion Model Notes · 论文 004</span>
+      </div>
+      <p class="footer-note">工程笔记 · 代码笔记</p>
+      <div class="footer-links">
+        <a href="../index.html">论文库</a>
+        <a href="https://arxiv.org/abs/2006.11239">原文</a>
+        <a href="#top">回到顶部 ↑</a>
+      </div>
+    </div>
+  </footer>
+
+  <dialog class="lightbox" id="lightbox" aria-label="图片预览">
+    <button class="lightbox-close" type="button" data-close-lightbox aria-label="关闭大图">×</button>
+    <img id="lightbox-image" alt="">
+    <p class="lightbox-caption" id="lightbox-caption"></p>
+  </dialog>
+  <button class="back-to-top" type="button" aria-label="回到页面顶部">↑</button>
+  <script src="../assets/article.js" defer></script>
+</body>
+</html>

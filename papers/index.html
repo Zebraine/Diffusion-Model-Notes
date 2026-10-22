@@ -52,23 +52,23 @@
             <a class="button button-ghost" href="#about">这个库怎么用</a>
           </div>
           <div class="home-stats" aria-label="论文库概览">
-            <div class="home-stat"><strong>2</strong><span>论文 · Papers</span></div>
-            <div class="home-stat"><strong>19</strong><span>章节 · Sections</span></div>
-            <div class="home-stat"><strong>19</strong><span>图示 · Figures</span></div>
-            <div class="home-stat"><strong>148</strong><span>公式 · Equations</span></div>
+            <div class="home-stat"><strong>4</strong><span>论文 · Papers</span></div>
+            <div class="home-stat"><strong>43</strong><span>章节 · Sections</span></div>
+            <div class="home-stat"><strong>24</strong><span>图示 · Figures</span></div>
+            <div class="home-stat"><strong>190</strong><span>公式 · Equations</span></div>
           </div>
         </div>
         <aside class="home-feature" aria-label="最新收录">
-          <a class="feature-card" data-fit="cover" href="ddpm/index.html">
+          <a class="feature-card" data-fit="cover" href="ddpm-engineering/index.html">
   <span class="feature-cover">
-    <img src="ddpm/images/fig1-samples.webp" alt="DDPM 生成的 CelebA-HQ 人脸样本与无条件 CIFAR-10 样本" width="1110" height="670" loading="eager" decoding="sync">
-    <span class="feature-index">002</span>
+    <img src="ddpm-engineering/images/cover.webp" alt="DDPM 工程实现封面：训练与采样流水线代码面板" width="1600" height="900" loading="eager" decoding="sync">
+    <span class="feature-index">004</span>
   </span>
   <span class="feature-body">
-    <span class="feature-label">最新收录 / Paper 精译</span>
-    <span class="feature-title">去噪扩散概率模型</span>
-    <span class="feature-en">Denoising Diffusion Probabilistic Models</span>
-    <span class="feature-foot"><span>NeurIPS 2020 · 2020</span><span class="feature-arrow" aria-hidden="true">→</span></span>
+    <span class="feature-label">最新收录 / 工程笔记</span>
+    <span class="feature-title">DDPM 的工程实现</span>
+    <span class="feature-en">Engineering a Denoising Diffusion Probabilistic Model</span>
+    <span class="feature-foot"><span>代码笔记 · 2026</span><span class="feature-arrow" aria-hidden="true">→</span></span>
   </span>
 </a>
         </aside>
@@ -80,9 +80,9 @@
         <div>
           <p class="section-kicker">Library / 论文库</p>
           <h2>从一篇论文开始</h2>
-          <p>每篇译文都尽量保留原文的结构、公式编号和图表，并在需要的地方补上中文语境下的解释。</p>
+          <p>每篇论文或笔记都尽量保留结构、公式编号与图表，并在需要的地方补上中文语境下的解释。</p>
         </div>
-        <p class="section-count" id="result-count" aria-live="polite">2 篇论文 篇论文</p>
+        <p class="section-count" id="result-count" aria-live="polite">4 篇论文 篇论文</p>
       </div>
 
       <div class="library-toolbar">
@@ -93,11 +93,14 @@
         </label>
         <div class="tag-filter" id="tag-filter" role="group" aria-label="按标签筛选">
           <button class="tag-chip is-active" type="button" data-tag="all">全部</button>
-          <button class="tag-chip" type="button" data-tag="扩散模型基础">扩散模型基础 <span aria-hidden="true">2</span></button>
-          <button class="tag-chip" type="button" data-tag="DDPM">DDPM <span aria-hidden="true">2</span></button>
-          <button class="tag-chip" type="button" data-tag="代码实现">代码实现 <span aria-hidden="true">1</span></button>
-          <button class="tag-chip" type="button" data-tag="数学推导">数学推导 <span aria-hidden="true">1</span></button>
+          <button class="tag-chip" type="button" data-tag="DDPM">DDPM <span aria-hidden="true">4</span></button>
+          <button class="tag-chip" type="button" data-tag="扩散模型基础">扩散模型基础 <span aria-hidden="true">3</span></button>
+          <button class="tag-chip" type="button" data-tag="代码实现">代码实现 <span aria-hidden="true">2</span></button>
+          <button class="tag-chip" type="button" data-tag="数学推导">数学推导 <span aria-hidden="true">2</span></button>
+          <button class="tag-chip" type="button" data-tag="工程实践">工程实践 <span aria-hidden="true">1</span></button>
           <button class="tag-chip" type="button" data-tag="图像生成">图像生成 <span aria-hidden="true">1</span></button>
+          <button class="tag-chip" type="button" data-tag="优化">优化 <span aria-hidden="true">1</span></button>
+          <button class="tag-chip" type="button" data-tag="score matching">score matching <span aria-hidden="true">1</span></button>
         </div>
       </div>
 
@@ -141,6 +144,50 @@
     <ul class="paper-card-tags"><li><span>扩散模型基础</span></li><li><span>数学推导</span></li><li><span>DDPM</span></li><li><span>图像生成</span></li></ul>
     <div class="paper-card-foot">
       <span>9 章 · 8 图 · 23 式</span>
+      <span class="paper-card-go">阅读</span>
+    </div>
+  </div>
+</article>
+
+<article class="paper-card" data-tags="数学推导|DDPM|扩散模型基础|score matching" data-search="ddpm 的数学原理 the mathematics of denoising diffusion probabilistic models 不跳步地拆开 ddpm：前向高斯链、后验配方、elbo 的三项分解、ε-预测与 score matching 的等价关系，以及逆向采样的概率含义。 从一条固定加噪链出发，把生成问题写成变分推断；推导闭式前向、可解后验、elbo 三项、ε-预测与 score matching，最后回答为什么预测噪声就能采样。 学习笔记 2026 diffusion model notes 数学推导 ddpm 扩散模型基础 score matching">
+  <a class="paper-card-cover" data-fit="cover" href="ddpm-math/index.html" aria-label="阅读《DDPM 的数学原理》">
+    <img src="ddpm-math/images/cover.webp" alt="DDPM 数学原理封面：前向加噪链与逆向去噪链的示意图" width="1600" height="900" loading="eager" decoding="sync">
+    <span class="paper-card-index">003</span>
+    <span class="paper-card-kind">原理长文</span>
+  </a>
+  <div class="paper-card-body">
+    <div class="paper-card-topline">
+      <span>学习笔记</span>
+      <span>2026</span>
+    </div>
+    <h3><a href="ddpm-math/index.html">DDPM 的数学原理</a></h3>
+    <p class="paper-card-en">The Mathematics of Denoising Diffusion Probabilistic Models</p>
+    <p class="paper-card-summary">不跳步地拆开 DDPM：前向高斯链、后验配方、ELBO 的三项分解、ε-预测与 score matching 的等价关系，以及逆向采样的概率含义。</p>
+    <ul class="paper-card-tags"><li><span>数学推导</span></li><li><span>DDPM</span></li><li><span>扩散模型基础</span></li><li><span>score matching</span></li></ul>
+    <div class="paper-card-foot">
+      <span>10 章 · 3 图 · 36 式</span>
+      <span class="paper-card-go">阅读</span>
+    </div>
+  </div>
+</article>
+
+<article class="paper-card" data-tags="工程实践|代码实现|DDPM|优化" data-search="ddpm 的工程实现 engineering a denoising diffusion probabilistic model 结合 code/ddpm 的实现，拆解 u-net 结构、时间嵌入、权重标准化、注意力、ema、梯度裁剪、混合精度、ddim 与检查点设计。 把论文里的公式落到可训练、可复现、可在 cpu 上运行的代码：u-net 的每个块、时间条件、损失尺度、ema、检查点、采样加速与常见数值陷阱。 代码笔记 2026 diffusion model notes 工程实践 代码实现 ddpm 优化">
+  <a class="paper-card-cover" data-fit="cover" href="ddpm-engineering/index.html" aria-label="阅读《DDPM 的工程实现》">
+    <img src="ddpm-engineering/images/cover.webp" alt="DDPM 工程实现封面：训练与采样流水线代码面板" width="1600" height="900" loading="lazy" decoding="async">
+    <span class="paper-card-index">004</span>
+    <span class="paper-card-kind">工程笔记</span>
+  </a>
+  <div class="paper-card-body">
+    <div class="paper-card-topline">
+      <span>代码笔记</span>
+      <span>2026</span>
+    </div>
+    <h3><a href="ddpm-engineering/index.html">DDPM 的工程实现</a></h3>
+    <p class="paper-card-en">Engineering a Denoising Diffusion Probabilistic Model</p>
+    <p class="paper-card-summary">结合 code/DDPM 的实现，拆解 U-Net 结构、时间嵌入、权重标准化、注意力、EMA、梯度裁剪、混合精度、DDIM 与检查点设计。</p>
+    <ul class="paper-card-tags"><li><span>工程实践</span></li><li><span>代码实现</span></li><li><span>DDPM</span></li><li><span>优化</span></li></ul>
+    <div class="paper-card-foot">
+      <span>14 章 · 2 图 · 6 式</span>
       <span class="paper-card-go">阅读</span>
     </div>
   </div>

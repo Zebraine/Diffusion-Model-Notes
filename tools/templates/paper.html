@@ -35,7 +35,7 @@
       <nav class="header-nav" aria-label="页面导航">
         <a href="../index.html">论文库</a>
         <a href="#article">正文</a>
-        <a class="source-link" href="{{SOURCE_URL}}" target="_blank" rel="noopener noreferrer">英文原文 ↗</a>
+        <a class="source-link" href="{{SOURCE_URL}}" target="_blank" rel="noopener noreferrer">{{SOURCE_LABEL}} ↗</a>
       </nav>
     </div>
   </header>
@@ -94,9 +94,9 @@
       {{MOBILE_TOC}}
       <article class="prose" id="article">
         <div class="translation-note">
-          <span class="note-seal" aria-hidden="true">译</span>
+          <span class="note-seal" aria-hidden="true">{{NOTE_SEAL}}</span>
           <div>
-            <strong>翻译说明</strong>
+            <strong>{{NOTE_LABEL}}</strong>
             <p>{{TRANSLATION_NOTE}}</p>
           </div>
         </div>

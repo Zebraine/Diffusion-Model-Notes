@@ -165,7 +165,8 @@ function heroButtons(paper) {
   if (paper.pdf_url) {
     buttons.push(`<a class="button button-ghost" href="${escapeAttr(paper.pdf_url)}" target="_blank" rel="noopener noreferrer">PDF 原文 ↗</a>`);
   }
-  buttons.push(`<a class="button button-ghost" href="${escapeAttr(paper.source_url || "#")}" target="_blank" rel="noopener noreferrer">英文摘要 ↗</a>`);
+  const sourceButtonLabel = paper.source_button_label || "英文摘要";
+  buttons.push(`<a class="button button-ghost" href="${escapeAttr(paper.source_url || "#")}" target="_blank" rel="noopener noreferrer">${escapeHtml(sourceButtonLabel)} ↗</a>`);
   return buttons.join("\n            ");
 }
 
@@ -187,7 +188,8 @@ function heroStats(paper) {
 function sourceActions(paper) {
   const actions = [];
   if (paper.source_url) {
-    actions.push(`<a class="button button-primary" href="${escapeAttr(paper.source_url)}" target="_blank" rel="noopener noreferrer">阅读英文原文 ↗</a>`);
+    const sourceActionLabel = paper.source_action_label || "阅读英文原文";
+    actions.push(`<a class="button button-primary" href="${escapeAttr(paper.source_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(sourceActionLabel)} ↗</a>`);
   }
   if (paper.pdf_url) {
     actions.push(`<a class="button button-ghost" href="${escapeAttr(paper.pdf_url)}" target="_blank" rel="noopener noreferrer">下载 PDF ↗</a>`);
@@ -283,7 +285,10 @@ function renderPaper(paper, all, rendered) {
     COVER_RATIO: escapeAttr(paper.cover_ratio || "3x1"),
     COVER_CAPTION: escapeHtml(paper.cover_caption || ""),
     COVER_META: escapeHtml(paper.cover_meta || `${paper.venue || ""} · ${paper.year || ""}`),
+    NOTE_LABEL: escapeHtml(paper.note_label || "翻译说明"),
+    NOTE_SEAL: escapeHtml(paper.note_seal || "译"),
     TRANSLATION_NOTE: paper.translation_note || "公式编号沿用原文；为便于中文阅读，正文引用改为作者-年份。图表、表格与算法已重新排版。正文为全译，附录为导读与关键结论选译。",
+    SOURCE_LABEL: escapeHtml(paper.source_label || "英文原文"),
     CONTENT: rendered.html,
     TOC: rendered.toc.aside,
     MOBILE_TOC: rendered.toc.mobile,
