@@ -1,0 +1,69 @@
+{
+  "slug": "score-sde",
+  "order": 5,
+  "kind": "论文精读",
+  "series": "Score-Based 扩散模型",
+  "title": "基于 SDE 的分数扩散模型",
+  "title_lead": "基于 SDE 的",
+  "title_accent": "分数扩散模型",
+  "title_en": "Score-Based Generative Modeling through Stochastic Differential Equations",
+  "dek": "这篇论文的意义不止是生成：它把 SMLD 与 DDPM 统一成连续时间 SDE，让 score 成为可条件化、可逆、能做逆问题的通用先验。",
+  "authors": [
+    {
+      "name": "Yang Song",
+      "url": "https://arxiv.org/search/?query=Yang+Song&searchtype=author"
+    },
+    {
+      "name": "Jascha Sohl-Dickstein",
+      "url": "https://arxiv.org/search/?query=Jascha+Sohl-Dickstein&searchtype=author"
+    },
+    {
+      "name": "Diederik P. Kingma",
+      "url": "https://arxiv.org/search/?query=Diederik+P.+Kingma&searchtype=author"
+    },
+    {
+      "name": "Abhishek Kumar",
+      "url": "https://arxiv.org/search/?query=Abhishek+Kumar&searchtype=author"
+    },
+    {
+      "name": "Stefano Ermon",
+      "url": "https://arxiv.org/search/?query=Stefano+Ermon&searchtype=author"
+    },
+    {
+      "name": "Ben Poole",
+      "url": "https://arxiv.org/search/?query=Ben+Poole&searchtype=author"
+    }
+  ],
+  "date": "2020-11-26",
+  "year": "2021",
+  "venue": "ICLR 2021",
+  "reading_minutes": 45,
+  "extra_stat": {
+    "value": 9,
+    "label": "附录 · Appendices"
+  },
+  "tags": [
+    "score matching",
+    "SDE",
+    "逆问题",
+    "扩散模型基础",
+    "数学推导"
+  ],
+  "summary": "不止生成：从 DDPM 到连续 SDE，score 如何统一扩散模型，并打开可控生成、逆问题、似然与表征。正文精译 + 框架导读。",
+  "cover": "images/cover.webp",
+  "cover_alt": "Score-Based 扩散模型封面：数据到噪声再到数据的 SDE 链",
+  "cover_caption": "不止于生成",
+  "cover_meta": "SDE · 通用扩散框架",
+  "cover_ratio": "16x9",
+  "source_url": "https://arxiv.org/abs/2011.13456",
+  "pdf_url": "https://arxiv.org/pdf/2011.13456",
+  "code_url": "https://github.com/yang-song/score_sde",
+  "source_label": "英文原文",
+  "source_button_label": "原始论文",
+  "source_action_label": "阅读英文原文",
+  "note_label": "阅读说明",
+  "note_seal": "读",
+  "translation_note": "正文精译 + 框架导读；附录体量较大，给出结构与关键结论。公式编号沿用原文；图表按本文顺序重排，图片取自原文并本地化。",
+  "disclaimer": "本页面为学习交流用途的中文精译与导读。原文、插图及相关材料的版权归原作者所有。正文为精译，附录为导读与关键结论选译。",
+  "build": true
+}

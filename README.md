@@ -1,6 +1,6 @@
 ## Diffusion Model Notes
 
-Personal notes on diffusion models.
+Personal notes on diffusion models，重点关注 score-based diffusion / SDE：不只图像生成，也包括条件采样、逆问题、似然与表征。
 
 - 论文库（中文精译 / 精读）：打开 [`papers/index.html`](papers/index.html)。
 - 新增论文、构建方式与目录约定：见 [`papers/README.md`](papers/README.md)。
@@ -12,6 +12,7 @@ Personal notes on diffusion models.
 2. **去噪扩散概率模型**（Denoising Diffusion Probabilistic Models, DDPM）— NeurIPS 2020 中文精译。
 3. **DDPM 的数学原理** — 从变分下界到 score matching 的原理长文。
 4. **DDPM 的工程实现** — U-Net、EMA、DDIM、检查点与优化的工程笔记。
+5. **基于 SDE 的分数扩散模型** — ICLR 2021 论文精读：SMLD/DDPM 的连续时间统一，以及 score 如何扩展到可控生成、逆问题、似然与表征。
 
 ## 代码实现
 

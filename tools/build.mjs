@@ -176,9 +176,11 @@ function heroStats(paper) {
     [stats.sections, "章节 · Sections"],
     [stats.figures, "图示 · Figures"],
     [stats.equations ?? stats.formulas, "公式 · Equations"],
-    stats.algorithms
-      ? [stats.algorithms, "算法 · Algorithms"]
-      : [stats.code_blocks, "代码 · Snippets"],
+    paper.extra_stat
+      ? [paper.extra_stat.value, paper.extra_stat.label]
+      : stats.algorithms
+        ? [stats.algorithms, "算法 · Algorithms"]
+        : [stats.code_blocks, "代码 · Snippets"],
   ];
   return items
     .map(([value, label]) => `<div class="hero-stat"><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></div>`)

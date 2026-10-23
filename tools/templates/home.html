@@ -4,14 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Diffusion Model Notes · 中文论文库</title>
-  <meta name="description" content="扩散模型中文论文库：从 DDPM 的原始论文到逐行代码解读，保留公式、图表与实现细节，可离线阅读。">
+  <meta name="description" content="扩散模型中文论文库：从 DDPM 到 score-based diffusion / SDE，覆盖公式推导、逆问题与可运行代码，可离线阅读。">
   <meta name="author" content="Diffusion Model Notes">
   <meta name="theme-color" content="#f6f1e8">
   <meta name="color-scheme" content="light">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="zh_CN">
   <meta property="og:title" content="Diffusion Model Notes · 中文论文库">
-  <meta property="og:description" content="把扩散模型读成自己的东西：论文精译、公式推导与可运行代码。">
+  <meta property="og:description" content="把扩散模型读成自己的东西：score-based diffusion、SDE、逆问题与可运行代码。">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="assets/style.css">
   <link rel="stylesheet" href="assets/home.css">
@@ -43,10 +43,10 @@
             <span class="eyebrow-dot" aria-hidden="true"></span>
             <span>Diffusion Model Notes</span>
             <span class="kicker-slash" aria-hidden="true">/</span>
-            <span>中文论文库</span>
+            <span>score-based 论文库</span>
           </p>
           <h1>把扩散模型<br><em>读成自己的东西</em></h1>
-          <p class="home-dek">不从调包开始，也不止步于公式。这里把扩散模型的原始论文、关键推导与可运行实现放在同一条阅读路径上：先建立直觉，再拆开数学，最后回到代码。</p>
+          <p class="home-dek">不止生成图像。这里把 score-based diffusion 的原始论文、关键推导、逆问题与可运行实现放在同一条阅读路径上：先建立直觉，再拆开 SDE / score 的数学，最后回到代码与任务。</p>
           <div class="home-actions">
             <a class="button button-primary" href="#library">浏览论文 <span aria-hidden="true">↓</span></a>
             <a class="button button-ghost" href="#about">这个库怎么用</a>
@@ -99,6 +99,7 @@
           <p class="section-kicker">About / 关于</p>
           <h2>一个可以一直加下去的中文论文库</h2>
           <p>页面不是一次性写死的长文，而是由共享的排版系统、逐篇的原文／元数据与一个小型构建脚本组成。新增一篇论文，只需要新建目录、放入图片与正文，再运行一次构建。</p>
+          <p>内容重点放在 score-based diffusion / SDE：除了图像生成，也覆盖条件采样、逆问题、似然与表征。</p>
           <p>视觉上沿用暖纸张、中文衬线标题与青绿主色的编辑风格；技术上保持零前端框架、零外部依赖，双击 HTML 即可离线阅读。</p>
         </div>
         <ul class="about-points">
