@@ -17,3 +17,9 @@ Personal notes on diffusion models，重点关注 score-based diffusion / SDE：
 ## 代码实现
 
 - CPU 版 DDPM（模块化训练 / 采样 / 检查点）：[`code/DDPM`](code/DDPM)，用法见 [`code/DDPM/README.md`](code/DDPM/README.md)。
+
+## 参考视频/博客
+
+- [Diffusion Model 的数学原理](https://ootorikka.github.io/2026/02/21/Diffussion%20Models%E7%9A%84%E6%95%B0%E5%AD%A6%E5%8E%9F%E7%90%86/)
+- [Diffusion Models: DDPM | Generative AI Animated](https://www.youtube.com/watch?v=lUljxdkolK8)
+- [Score-based Diffusion Models | Generative AI Animated](https://www.youtube.com/watch?v=lUljxdkolK8)
